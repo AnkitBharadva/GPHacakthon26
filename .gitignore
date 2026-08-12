@@ -1,0 +1,103 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+*.mo
+*.pot
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+dist/
+dist-ssr/
+*.local
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Cache directories
+.cache/
+backend/fastf1_cache/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Audio files
+*.wav
+*.mp3
+*.mp4
+*.aac
+*.flac
+*.ogg
+*.m4a
+
+# PDF files (if they're documentation you don't want in repo)
+# Uncomment if needed
+# *.pdf
+
+# Images (if they're temporary)
+# Uncomment if needed
+# *.jpg
+# *.jpeg
+# *.png
+WhatsApp Image 2026-08-10 at 2.45.49 PM.jpeg
+Grandprix Problem Statements.pdf
+maxie.jpg
