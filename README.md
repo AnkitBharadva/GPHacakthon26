@@ -42,7 +42,6 @@
 - [Live Demo Capability](#-live-demo-capability)
 - [Performance & Accuracy](#-performance--accuracy)
 - [Future Roadmap](#-future-roadmap)
-- [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -157,13 +156,15 @@ flowchart TD
 
 **WER Formula:**
 
-$$\text{WER} = \frac{S + D + I}{N}$$
+```
+WER = (S + D + I) / N
+```
 
 Where:
-- $S$ = Substitutions (wrong words)
-- $D$ = Deletions (missing words)
-- $I$ = Insertions (extra words)
-- $N$ = Total words in reference transcript
+- **S** = Substitutions (wrong words)
+- **D** = Deletions (missing words)
+- **I** = Insertions (extra words)
+- **N** = Total words in reference transcript
 
 **Text Normalization Pipeline** (applied before WER computation):
 ```
@@ -199,9 +200,9 @@ transcript = PROCESSOR.batch_decode(predicted_ids, skip_special_tokens=True)[0]
 
 | Dimension | Symbol | Range | Measures |
 | :--- | :---: | :---: | :--- |
-| **Arousal** | $A$ | $[0, 1]$ | Physiological activation — vocal tension, pitch elevation, energy |
-| **Valence** | $V$ | $[0, 1]$ | Emotional polarity — pleasant (→1) vs. distressed (→0) |
-| **Dominance** | $D$ | $[0, 1]$ | Perceived control — commanding (→1) vs. submissive (→0) |
+| **Arousal** | `A` | `[0, 1]` | Physiological activation — vocal tension, pitch elevation, energy |
+| **Valence** | `V` | `[0, 1]` | Emotional polarity — pleasant (→1) vs. distressed (→0) |
+| **Dominance** | `D` | `[0, 1]` | Perceived control — commanding (→1) vs. submissive (→0) |
 
 Unlike categorical emotion classifiers that force a single label, this model produces a **continuous 3D emotional manifold**, enabling nuanced differentiation between, for example, *focused aggression* (high A, low V, high D) and *panicked distress* (high A, low V, low D).
 
@@ -233,7 +234,7 @@ Raw Audio ──→ Zero-Variance Guard (σ > 10⁻⁵) ──→ Spectral Gatin
 | :--- | :--- | :--- |
 | **Zero-Variance Guard** | `np.std(audio) > 1e-5` | Prevents division-by-zero NaN on silent/empty clips |
 | **Spectral Gating** | `noisereduce.reduce_noise(y=audio, sr=16000, prop_decrease=0.7)` | Removes stationary background noise while preserving speech |
-| **RMS Energy** | $E_{\text{RMS}} = \sqrt{\frac{1}{N}\sum_{i=1}^{N} x_i^2}$ | Acoustic energy metric for neural-acoustic fusion |
+| **RMS Energy** | `E_rms = sqrt(mean(x²))` | Acoustic energy metric for neural-acoustic fusion |
 
 ---
 
@@ -241,20 +242,21 @@ Raw Audio ──→ Zero-Variance Guard (σ > 10⁻⁵) ──→ Spectral Gatin
 
 The continuous dimensional outputs are mapped to discrete driver states via **engineer-adjustable thresholds**:
 
-$$\text{Driver State} = \begin{cases} 
-\textcolor{red}{\textbf{STRESSED}} & \text{if } A > T_{\text{arousal}} \text{ AND } V < T_{\text{valence}} \\[6pt]
-\textcolor{goldenrod}{\textbf{FATIGUED}} & \text{if } A < T_{\text{tired\_arousal}} \text{ AND } V < T_{\text{tired\_valence}} \\[6pt]
-\textcolor{green}{\textbf{CALM}} & \text{otherwise}
-\end{cases}$$
+```
+Driver State =
+  🔴 STRESSED   →  if  Arousal > T_arousal   AND  Valence < T_valence
+  🟡 FATIGUED   →  if  Arousal < T_tired_a   AND  Valence < T_tired_v
+  🟢 CALM       →  otherwise
+```
 
 **Default Threshold Configuration:**
 
 | Threshold | Symbol | Default | Adjustable |
 | :--- | :---: | :---: | :---: |
-| Arousal (Stress) | $T_{\text{arousal}}$ | `0.60` | ✅ Via UI slider |
-| Valence (Stress) | $T_{\text{valence}}$ | `0.40` | ✅ Via UI slider |
-| Arousal (Fatigue) | $T_{\text{tired\_arousal}}$ | `0.40` | Hardcoded |
-| Valence (Fatigue) | $T_{\text{tired\_valence}}$ | `0.55` | Hardcoded |
+| Arousal (Stress) | `T_arousal` | `0.60` | ✅ Via UI slider |
+| Valence (Stress) | `T_valence` | `0.40` | ✅ Via UI slider |
+| Arousal (Fatigue) | `T_tired_a` | `0.40` | Hardcoded |
+| Valence (Fatigue) | `T_tired_v` | `0.55` | Hardcoded |
 
 > **Dynamic Calibration:** Race engineers can modify stress thresholds in real-time via the **Threshold Tuner** drawer panel. Changes trigger a `POST /api/reclassify` that re-scores all cached messages against the new boundaries — no re-inference required.
 
@@ -582,7 +584,7 @@ The dashboard implements a **glassmorphic dark theme** inspired by professional 
 
 ### Threshold Tuner (Slide-Out Drawer)
 
-A right-side panel with two range sliders (`<input type="range">`) for $T_{\text{arousal}}$ and $T_{\text{valence}}$. Clicking **"Re-classify All"** triggers `POST /api/reclassify` — all cached messages are re-scored against the new boundaries without re-running ML inference.
+A right-side panel with two range sliders (`<input type="range">`) for `T_arousal` and `T_valence`. Clicking **"Re-classify All"** triggers `POST /api/reclassify` — all cached messages are re-scored against the new boundaries without re-running ML inference.
 
 ---
 
@@ -667,70 +669,6 @@ Raw Driver Audio → 16kHz Mono → WavLM-Base-Plus (Frozen) → T×768 Embeddin
                                                          ▼          ▼          ▼
                                                        CALM     STRESSED     TIRED
 ```
-
----
-
-## 🔧 Troubleshooting
-
-<details>
-<summary><b>Empty STT String or NaN Values</b></summary>
-
-Silent or extremely noisy clips can produce empty transcripts. The system handles this via:
-- Zero-variance guard: `np.std(audio) > 1e-5` before noise reduction
-- `np.nan_to_num()` to replace NaN with zero in emotion outputs
-- Empty string edge-case handling in WER computation (returns `1.0` if reference is empty, `0.0` if both are empty)
-
-</details>
-
-<details>
-<summary><b>CORS Errors Between Frontend and Backend</b></summary>
-
-FastAPI includes `CORSMiddleware` with `allow_origins=["*"]`:
-```python
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-                   allow_methods=["*"], allow_headers=["*"])
-```
-If issues persist, verify both servers are running and accessible.
-
-</details>
-
-<details>
-<summary><b>Port 8000 or 3000 Already in Use</b></summary>
-
-```bash
-# Find process on port (Windows)
-netstat -ano | findstr :8000
-
-# Kill by PID
-taskkill /PID <PID> /F
-
-# Or launch on alternative ports
-uvicorn backend.main:app --port 8001
-npm run dev -- --port 3001
-```
-
-</details>
-
-<details>
-<summary><b>FastF1 Session Load Failures</b></summary>
-
-FastF1 requires internet access for first-time session downloads. Subsequent loads use the local cache at `backend/fastf1_cache/`. If a session fails to load:
-- Check internet connectivity
-- Verify the GP name matches FastF1's naming convention
-- Clear the cache directory and retry
-
-</details>
-
-<details>
-<summary><b>Model Download on First Run</b></summary>
-
-On first startup, the backend downloads ~1.5 GB of model weights:
-- `openai/whisper-base` (~148 MB)
-- `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` (~1.2 GB)
-
-Models are cached by HuggingFace Transformers in `~/.cache/huggingface/`. Subsequent startups load from cache.
-
-</details>
 
 ---
 
