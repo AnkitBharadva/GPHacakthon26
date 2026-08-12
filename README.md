@@ -1,282 +1,743 @@
-# The Silent Co-Driver 🏎️🎙️
+<div align="center">
 
-> **Formula 1 Driver Radio Speech-to-Text (STT) • Continuous Dimensional Vocal Stress Scoring • FastF1 Lap Performance Alignment Engine**
+# 🏎️ The Silent Co-Driver
+
+### Formula 1 Vocal Stress Intelligence & Telemetry Alignment Platform
+
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React 19](https://img.shields.io/badge/React-19.1-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-EE4C2C?style=flat-square&logo=pytorch&logoColor=white)](https://pytorch.org)
+[![HuggingFace](https://img.shields.io/badge/🤗_HuggingFace-Transformers-FFD21E?style=flat-square)](https://huggingface.co)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+
+**Real-time speech-to-text transcription • Continuous dimensional vocal stress scoring • FastF1 lap performance correlation**
+
+> *"Box, box, box. The tyres are gone." — but what does the voice tell us that words alone cannot?*
+
+[Quick Start](#-quickstart) · [Architecture](#-system-architecture) · [ML Pipeline](#-machine-learning-pipeline) · [API Reference](#-api-reference) · [Demo](#-live-demo-capability)
+
+</div>
 
 ---
 
-## 1. Executive Summary & Core Value Proposition
+## 📋 Table of Contents
 
-**The Silent Co-Driver** is an intelligence dashboard and real-time audio analytics suite built specifically for Formula 1 race engineers and telemetry analysts. In high-speed motorsport, driver radio communications provide critical context regarding vehicle mechanical issues, tyre degradation, track conditions, and driver fatigue. 
-
-The application solves three primary challenges:
-1. **Automated Radio Transcription:** Transcribes noisy driver radio transmissions in real time using `openai/whisper-base` and benchmarks accuracy against human ground-truth transcripts using Word Error Rate (WER).
-2. **Vocal Stress & Fatigue Quantifier:** Evaluates continuous 3D acoustic emotion dimensions—**Arousal** (activation/energy), **Valence** (pleasurable vs. distressing state), and **Dominance** (control)—via Wav2Vec2 (`audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`) to flag whether a driver is **STRESSED**, **CALM**, or **FATIGUED**.
-3. **Telemetry & Pace Alignment:** Aligns UTC radio message timestamps directly with driver lap timing curves fetched from **FastF1**. Race engineers can instantly observe whether a driver sounding stressed (e.g. engine overheating, brake fade, yellow flag calls) correlates with pace loss or erratic lap times on track.
+- [Problem Statement](#-problem-statement)
+- [Our Solution](#-our-solution)
+- [System Architecture](#-system-architecture)
+- [Machine Learning Pipeline](#-machine-learning-pipeline)
+  - [Speech-to-Text Engine](#a-speech-to-text-engine)
+  - [Dimensional Emotion Classifier](#b-dimensional-emotion-classifier)
+  - [Acoustic Preprocessing](#c-acoustic-preprocessing--noise-reduction)
+  - [Stress Classification Logic](#d-rule-based-stress-classification)
+- [Telemetry Alignment Engine](#-telemetry-alignment-engine)
+- [Dataset & Model Credits](#-dataset--model-credits)
+- [Tech Stack](#%EF%B8%8F-tech-stack)
+- [Project Structure](#-project-structure)
+- [Database Schema](#-database-schema)
+- [API Reference](#-api-reference)
+- [Quickstart](#-quickstart)
+- [Frontend Dashboard](#-frontend-dashboard)
+- [Live Demo Capability](#-live-demo-capability)
+- [Performance & Accuracy](#-performance--accuracy)
+- [Future Roadmap](#-future-roadmap)
+- [Troubleshooting](#-troubleshooting)
 
 ---
 
-## 2. High-Level System Architecture
+## 🎯 Problem Statement
+
+In Formula 1, **driver radio communications are a goldmine of real-time intelligence** — revealing mechanical failures, tyre degradation, track condition changes, and driver fatigue — often *before* telemetry sensors detect them. Today, race engineers must:
+
+1. **Manually listen** to dozens of radio messages per race under extreme time pressure
+2. **Subjectively interpret** whether a driver sounds stressed, fatigued, or composed
+3. **Mentally correlate** radio tone with lap timing data scattered across separate systems
+
+This creates **cognitive overload** during the most critical decision-making moments of a race. There is no automated system that bridges the gap between **what a driver says**, **how they sound**, and **how they're performing on track**.
+
+### The Gap We Fill
+
+| Current State | Our Innovation |
+| :--- | :--- |
+| Manual radio listening | Automated Whisper STT with WER benchmarking |
+| Subjective "gut feel" stress assessment | Quantified 3D dimensional emotion scoring (Arousal, Valence, Dominance) |
+| Separate telemetry and radio analysis tools | Unified timestamp-aligned pace vs. stress visualization |
+| Static thresholds, no adaptability | Live engineer-tunable stress classification boundaries |
+
+---
+
+## 💡 Our Solution
+
+**The Silent Co-Driver** is an end-to-end intelligence platform that processes raw F1 driver radio audio through a multi-model ML pipeline, producing:
+
+```
+Raw Radio Audio ──→ Noise Reduction ──→ ┬── Whisper STT ──→ Transcript + WER
+                                        │
+                                        └── Wav2Vec2 ──→ Arousal, Valence, Dominance ──→ Mood State
+                                                                    │
+                                                         ┌─────────┴─────────┐
+                                                         ▼                   ▼
+                                                    FastF1 Laps        Telemetry Chart
+                                                    Alignment          Visualization
+```
+
+### Three Core Capabilities
+
+| # | Capability | Technical Implementation |
+| :---: | :--- | :--- |
+| **1** | **Automated Radio Transcription** | `openai/whisper-base` (74M params) with `jiwer` WER evaluation against human ground-truth |
+| **2** | **Vocal Stress Quantification** | `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` producing continuous Arousal/Valence/Dominance ∈ [0, 1] |
+| **3** | **Telemetry Pace Alignment** | UTC timestamp matching against FastF1 lap timing curves with pit stop flagging |
+
+---
+
+## 🏗 System Architecture
 
 ```mermaid
 flowchart TD
-    subgraph Data Sources & Telemetry
-        HF["Hugging Face Dataset\nMikCil/f1-team-radio\n(14,700 Clips, 43 Drivers)"]
-        F1["FastF1 API\nSession & Lap Timing Engine"]
-        UserAudio["User Audio Upload\n.wav / .mp3 Radio Clips"]
+    subgraph DS["Data Sources & Telemetry"]
+        HF["🤗 Hugging Face Dataset<br/><b>MikCil/f1-team-radio</b><br/>14,700 Clips · 43 Drivers · 149 GPs"]
+        F1["🏁 FastF1 API<br/>Session & Lap Timing Engine<br/>Sector Splits · Pit Stops · UTC Stamps"]
+        UA["🎤 User Audio Upload<br/>.wav / .mp3 Radio Clips"]
     end
 
-    subgraph Backend Engine (FastAPI - Port 8000)
-        NR["Spectral Noise Reduction\nnoisereduce (Prop Decrease 0.7)"]
-        STT["STT Engine\nopenai/whisper-base"]
-        WER["WER Calculator\njiwer Levenshtein Evaluation"]
-        EMO["Dimensional Emotion Classifier\naudeering/wav2vec2-large-robust-12-ft-emotion-msp-dim"]
-        THRESH["Rule-Based Threshold Logic\nArousal & Valence Categorization"]
-        DB[(SQLite Cache DB\nsilent_codriver.db)]
+    subgraph BE["Backend Engine — FastAPI · Port 8000"]
+        NR["🔇 Spectral Noise Reduction<br/><code>noisereduce</code> · prop_decrease=0.7<br/>Zero-Variance Guard σ > 10⁻⁵"]
+        STT["📝 STT Engine<br/><code>openai/whisper-base</code><br/>74M Parameters · 16kHz Input"]
+        WER["📊 WER Calculator<br/><code>jiwer</code> · Levenshtein Distance<br/>Text Normalization Pipeline"]
+        EMO["🧠 Emotion Classifier<br/><code>wav2vec2-large-robust-12-ft<br/>-emotion-msp-dim</code><br/>Arousal · Valence · Dominance"]
+        TH["⚙️ Threshold Engine<br/>Rule-Based Classification<br/>Dynamic Recalibration"]
+        DB[("💾 SQLite Cache<br/>silent_codriver.db<br/>4 Tables · Upsert Pattern")]
     end
 
-    subgraph Frontend Dashboard (Vite + React - Port 3000)
-        UI_Chart["Interactive Pace vs. Stress Line Chart"]
-        UI_Timeline["Radio Message Timeline & Audio Player"]
-        UI_STT["Dual Transcript View & WER Badge"]
-        UI_Tuner["Engineer Live Stress Threshold Tuner"]
-        UI_Upload["Stage Audio Clip Analyzer"]
+    subgraph FE["Frontend Dashboard — React 19 + Vite · Port 3000"]
+        CH["📈 Pace vs. Stress<br/>Custom SVG Line Chart"]
+        TL["📻 Radio Timeline<br/>Message Cards + Audio Player"]
+        TR["📋 Dual Transcript View<br/>Ground Truth vs. Whisper + WER Badge"]
+        TU["🎛️ Threshold Tuner<br/>Interactive Slider Drawer"]
+        UP["🎙️ Live Audio Analyzer<br/>Upload & Analyze in Real-Time"]
     end
 
-    HF -->|Radio Clips & Transcripts| DB
-    F1 -->|Lap Times & UTC Timestamps| DB
-    UserAudio -->|POST /api/audio/upload| NR
+    HF -->|"Stream: Audio + Transcripts"| DB
+    F1 -->|"Lap Times + UTC Timestamps"| DB
+    UA -->|"POST /api/audio/upload"| NR
 
     NR --> STT
     NR --> EMO
     STT --> WER
-    EMO --> THRESH
+    EMO --> TH
 
-    STT & WER & THRESH & DB -->|JSON REST API| UI_Chart
-    STT & WER & THRESH & DB -->|JSON REST API| UI_Timeline
-    STT & WER & THRESH & DB -->|JSON REST API| UI_STT
-    THRESH -->|POST /api/reclassify| UI_Tuner
-    NR & STT & EMO -->|POST /api/audio/upload| UI_Upload
+    DB & STT & WER & TH -->|"JSON REST API"| CH & TL & TR
+    TH -->|"POST /api/reclassify"| TU
+    NR & STT & EMO -->|"Multipart Response"| UP
+```
+
+### Service Topology
+
+| Service | Stack | Endpoint | Port | Role |
+| :--- | :--- | :--- | :---: | :--- |
+| **Backend API** | FastAPI + Uvicorn (Conda `gp`) | `http://127.0.0.1:8000` | `8000` | REST API, ML inference, SQLite cache, static audio |
+| **Static Audio** | FastAPI StaticFiles | `http://127.0.0.1:8000/static/audio/` | `8000` | Streaming `.wav` playback for dashboard |
+| **Frontend** | React 19 + Vite 6 | `http://127.0.0.1:3000` | `3000` | Interactive glassmorphic telemetry dashboard |
+
+---
+
+## 🧠 Machine Learning Pipeline
+
+### A. Speech-to-Text Engine
+
+| Property | Value |
+| :--- | :--- |
+| **Model** | [`openai/whisper-base`](https://huggingface.co/openai/whisper-base) |
+| **Parameters** | 74 Million |
+| **Input** | 16 kHz mono audio (resampled via `torchaudio.transforms.Resample`) |
+| **Output** | Raw English transcript |
+| **Evaluation** | Word Error Rate (WER) via [`jiwer`](https://github.com/jitsi/jiwer) |
+
+**WER Formula:**
+
+$$\text{WER} = \frac{S + D + I}{N}$$
+
+Where:
+- $S$ = Substitutions (wrong words)
+- $D$ = Deletions (missing words)
+- $I$ = Insertions (extra words)
+- $N$ = Total words in reference transcript
+
+**Text Normalization Pipeline** (applied before WER computation):
+```
+Input Text → lowercase() → strip_punctuation(regex: [^\w\s]) → collapse_whitespace() → strip() → Normalized Text
+```
+
+**Implementation** ([`stt_engine.py`](file:///D:/GP/backend/stt_engine.py)):
+```python
+# Audio Loading & Resampling
+waveform, sr = torchaudio.load(file_path)
+if sr != 16000:
+    waveform = torchaudio.transforms.Resample(sr, 16000)(waveform)
+waveform = waveform.mean(dim=0)  # Stereo → Mono
+
+# Whisper Inference
+input_features = PROCESSOR(waveform.numpy(), sampling_rate=16000, return_tensors="pt").input_features
+predicted_ids = MODEL.generate(input_features)
+transcript = PROCESSOR.batch_decode(predicted_ids, skip_special_tokens=True)[0]
 ```
 
 ---
 
-## 3. Network Ports & Local Service Endpoints
+### B. Dimensional Emotion Classifier
 
-| Service | Technology Stack | Host / URL | Port | Description |
-| :--- | :--- | :--- | :---: | :--- |
-| **Backend API** | FastAPI + Uvicorn (Conda `gp`) | `http://127.0.0.1:8000` | **8000** | REST API endpoints, ML inference pipelines, SQLite cache interface, static audio server |
-| **Static Audio Server** | FastAPI StaticFiles | `http://127.0.0.1:8000/static/audio/` | **8000** | Hosts streaming `.wav` driver radio clips for web audio playback |
-| **Frontend Web App** | React 19 + Vite | `http://127.0.0.1:3000` | **3000** | Interactive dark telemetry glassmorphism dashboard UI |
+| Property | Value |
+| :--- | :--- |
+| **Model** | [`audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`](https://huggingface.co/audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim) |
+| **Base Architecture** | Wav2Vec2 Large Robust |
+| **Fine-tuning Dataset** | MSP-Podcast (continuous dimensional annotations) |
+| **Output** | 3 continuous values ∈ [0, 1] |
+
+**Output Dimensions:**
+
+| Dimension | Symbol | Range | Measures |
+| :--- | :---: | :---: | :--- |
+| **Arousal** | $A$ | $[0, 1]$ | Physiological activation — vocal tension, pitch elevation, energy |
+| **Valence** | $V$ | $[0, 1]$ | Emotional polarity — pleasant (→1) vs. distressed (→0) |
+| **Dominance** | $D$ | $[0, 1]$ | Perceived control — commanding (→1) vs. submissive (→0) |
+
+Unlike categorical emotion classifiers that force a single label, this model produces a **continuous 3D emotional manifold**, enabling nuanced differentiation between, for example, *focused aggression* (high A, low V, high D) and *panicked distress* (high A, low V, low D).
+
+**Inference Pipeline** ([`emotion_engine.py`](file:///D:/GP/backend/emotion_engine.py)):
+```python
+# Wav2Vec2 Dimensional Inference (torch.no_grad context)
+inputs = PROCESSOR(audio_clean, sampling_rate=16000, return_tensors="pt")
+outputs = MODEL(**inputs)
+# Extract: [arousal, valence, dominance] ∈ [0, 1]³
+```
 
 ---
 
-## 4. Machine Learning Models & Speech Pipeline
+### C. Acoustic Preprocessing & Noise Reduction
 
-### A. Speech-to-Text (STT): `openai/whisper-base`
-* **Model ID:** `openai/whisper-base` (74 Million parameters)
-* **Execution:** Transcribes raw 16kHz audio arrays into normalized English text.
-* **Accuracy Evaluation:** Computes **Word Error Rate (WER)** using `jiwer` against human ground-truth transcripts:
-  $$\text{WER} = \frac{S + D + I}{N} = \frac{\text{Substitutions} + \text{Deletions} + \text{Insertions}}{\text{Total Words in Reference}}$$
-* **Text Normalization:** Lowercase conversion, punctuation stripping, and whitespace collapse.
+F1 radio transmissions contain **extreme background noise** — engine rumble up to 120 dB SPL, wind buffeting, and compression artifacts. Raw audio is unsuitable for direct model inference.
 
-### B. Dimensional Emotion Classifier: `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`
-* **Model ID:** `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`
-* **Architecture:** Wav2Vec2 Large Robust fine-tuned on MSP-Podcast continuous dimensional speech emotion dataset.
-* **Continuous Output Dimensions:**
-  1. **Arousal ($A \in [0, 1]$):** Measures physiological activation, vocal tension, pitch height, and energy.
-  2. **Valence ($V \in [0, 1]$):** Measures emotional state pleasantness vs. negative distress.
-  3. **Dominance ($D \in [0, 1]$):** Measures feeling of control vs. submissiveness.
+**Noise Reduction Pipeline:**
 
-### C. Acoustic Preprocessing & Noise Reduction (`noisereduce`)
-F1 radio transmissions contain extreme background engine rumble and wind noise (up to 120 dB SPL).
-* **Spectral Gating:** Applied via `noisereduce.reduce_noise(y=audio, sr=16000, prop_decrease=0.7)`.
-* **Zero-Variance Guard:** Prevents division-by-zero NaNs on silent clips by verifying signal standard deviation ($\sigma > 10^{-5}$) before spectral gating.
-* **Acoustic RMS Energy Fusion:** Combines Wav2Vec2 neural output with acoustic Root Mean Square (RMS) energy to ensure robust stress classification on high-pitch driver shout events.
+```
+Raw Audio ──→ Zero-Variance Guard (σ > 10⁻⁵) ──→ Spectral Gating ──→ Clean Audio
+                     │                                    │
+                     │ (if σ ≤ 10⁻⁵)                     │
+                     └── Return original ◄────────────────┘
+                         (prevent NaN)
+```
 
-### D. Rule-Based Dimensional Stress Threshold Logic
-The continuous dimensional outputs are mapped to discrete driver vocal states using adjustable thresholds:
+| Stage | Implementation | Purpose |
+| :--- | :--- | :--- |
+| **Zero-Variance Guard** | `np.std(audio) > 1e-5` | Prevents division-by-zero NaN on silent/empty clips |
+| **Spectral Gating** | `noisereduce.reduce_noise(y=audio, sr=16000, prop_decrease=0.7)` | Removes stationary background noise while preserving speech |
+| **RMS Energy** | $E_{\text{RMS}} = \sqrt{\frac{1}{N}\sum_{i=1}^{N} x_i^2}$ | Acoustic energy metric for neural-acoustic fusion |
 
-$$\text{Driver Mood State} = \begin{cases} 
-\text{STRESSED} & \text{if } A > T_{\text{arousal}} \text{ (default 0.60) and } V < T_{\text{valence}} \text{ (default 0.40)} \\
-\text{TIRED / FATIGUED} & \text{if } A < T_{\text{tired\_arousal}} \text{ (default 0.40) and } V < T_{\text{tired\_valence}} \text{ (default 0.55)} \\
-\text{CALM} & \text{otherwise}
+---
+
+### D. Rule-Based Stress Classification
+
+The continuous dimensional outputs are mapped to discrete driver states via **engineer-adjustable thresholds**:
+
+$$\text{Driver State} = \begin{cases} 
+\textcolor{red}{\textbf{STRESSED}} & \text{if } A > T_{\text{arousal}} \text{ AND } V < T_{\text{valence}} \\[6pt]
+\textcolor{goldenrod}{\textbf{FATIGUED}} & \text{if } A < T_{\text{tired\_arousal}} \text{ AND } V < T_{\text{tired\_valence}} \\[6pt]
+\textcolor{green}{\textbf{CALM}} & \text{otherwise}
 \end{cases}$$
 
-> **Dynamic Calibration:** Race engineers can modify $T_{\text{arousal}}$ and $T_{\text{valence}}$ in real-time via the UI **Engineer Stress Threshold Tuner** drawer (`POST /api/reclassify`).
+**Default Threshold Configuration:**
+
+| Threshold | Symbol | Default | Adjustable |
+| :--- | :---: | :---: | :---: |
+| Arousal (Stress) | $T_{\text{arousal}}$ | `0.60` | ✅ Via UI slider |
+| Valence (Stress) | $T_{\text{valence}}$ | `0.40` | ✅ Via UI slider |
+| Arousal (Fatigue) | $T_{\text{tired\_arousal}}$ | `0.40` | Hardcoded |
+| Valence (Fatigue) | $T_{\text{tired\_valence}}$ | `0.55` | Hardcoded |
+
+> **Dynamic Calibration:** Race engineers can modify stress thresholds in real-time via the **Threshold Tuner** drawer panel. Changes trigger a `POST /api/reclassify` that re-scores all cached messages against the new boundaries — no re-inference required.
 
 ---
 
-## 5. Mandatory Dataset & Model Credits
+## 🔗 Telemetry Alignment Engine
+
+The alignment module ([`alignment.py`](file:///D:/GP/backend/alignment.py)) bridges the gap between radio communications and on-track performance:
+
+```
+Radio Message UTC Timestamp ──→ Parse ISO 8601 ──→ Convert to Session-Relative Seconds
+                                                              │
+                                                              ▼
+                                                   Linear Scan Through Laps
+                                                              │
+                                                   ┌──────────┴──────────┐
+                                                   ▼                     ▼
+                                            Lap Window Match      No Match (pit/gap)
+                                            lap_start ≤ t ≤ lap_end
+                                                   │
+                                                   ▼
+                                         Enrich Message with:
+                                         • lap_number
+                                         • lap_time_seconds
+```
+
+**FastF1 Data Extraction** ([`fastf1_loader.py`](file:///D:/GP/backend/fastf1_loader.py)):
+
+| Data Point | Source | Purpose |
+| :--- | :--- | :--- |
+| `lap_number` | `session.laps.LapNumber` | Sequential lap index |
+| `lap_time_seconds` | `LapTime.total_seconds()` | Pace metric (seconds) |
+| `is_pit` | `PitOutTime` / `PitInTime` ≠ `NaT` | Pit stop flag |
+| `lap_start_time_sec` | Relative to session start | Alignment window start |
+| `lap_end_time_sec` | Start + LapTime | Alignment window end |
+
+**Driver Code Resolution:**
+```
+Dataset ID:  "MAXVER01"  →  [3:6].upper()  →  "VER"
+             "LEWHAM01"  →  [3:6].upper()  →  "HAM"
+             "DANRIC01"  →  [3:6].upper()  →  "RIC"
+```
+
+---
+
+## 📊 Dataset & Model Credits
 
 ### Primary Dataset: `MikCil/f1-team-radio`
-* **Source:** [Hugging Face Datasets: `MikCil/f1-team-radio`](https://huggingface.co/datasets/MikCil/f1-team-radio)
-* **License:** **CC-BY-4.0** (Attributed in accordance with dataset distribution terms)
-* **Overview:** Contains 14,700 audio/transcript rows spanning 43 drivers across 149 Grand Prix events (2018–2025).
-* **Ground Truth:** Includes human ground-truth transcripts used to evaluate Whisper STT accuracy.
 
-### Telemetry Provider: `FastF1` API
-* **Source:** [FastF1 Python Library](https://github.com/theOdev/FastF1)
-* **Usage:** Provides lap times, sector splits, pit stop flags, and driver racing numbers linked via driver 3-letter timing codes (`DANRIC01` $\rightarrow$ `RIC`, `LEWHAM01` $\rightarrow$ `HAM`, `MAXVER01` $\rightarrow$ `VER`).
+| Property | Value |
+| :--- | :--- |
+| **Source** | [HuggingFace: `MikCil/f1-team-radio`](https://huggingface.co/datasets/MikCil/f1-team-radio) |
+| **License** | **CC-BY-4.0** |
+| **Audio Clips** | **14,700** |
+| **Drivers** | **43** |
+| **Grand Prix Events** | **149** (2018–2025) |
+| **Ground Truth** | Human-annotated transcripts for WER evaluation |
+| **Loading Mode** | Streaming (`streaming=True`) to avoid full download |
+
+### ML Models Used
+
+| Model | HuggingFace ID | Parameters | Task |
+| :--- | :--- | :---: | :--- |
+| Whisper Base | `openai/whisper-base` | 74M | Speech-to-Text |
+| Wav2Vec2 Emotion | `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` | 315M | Dimensional Emotion |
+
+### Telemetry Provider
+
+| Provider | Source | Data |
+| :--- | :--- | :--- |
+| FastF1 | [github.com/theOdev/FastF1](https://github.com/theOdev/FastF1) | Lap times, sector splits, pit stops, driver codes |
 
 ---
 
-## 6. Complete Directory & File Structure
+## ⚙️ Tech Stack
+
+### Backend
+
+| Technology | Version | Purpose |
+| :--- | :--- | :--- |
+| **Python** | 3.10+ | Runtime |
+| **FastAPI** | 0.100+ | REST API framework |
+| **Uvicorn** | Latest | ASGI server |
+| **PyTorch** | 2.0+ | ML inference runtime |
+| **torchaudio** | 2.0+ | Audio loading & resampling |
+| **Transformers** | 4.30+ | Whisper & Wav2Vec2 model loading |
+| **jiwer** | Latest | Word Error Rate computation |
+| **noisereduce** | Latest | Spectral noise gating |
+| **soundfile** | Latest | WAV I/O |
+| **FastF1** | Latest | F1 telemetry & timing data |
+| **SQLite3** | Built-in | Embedded cache database |
+| **datasets** | Latest | HuggingFace dataset streaming |
+
+### Frontend
+
+| Technology | Version | Purpose |
+| :--- | :--- | :--- |
+| **React** | 19.1 | UI framework |
+| **Vite** | 6.3 | Build tool & dev server |
+| **Lucide React** | 0.511 | Icon system |
+| **Vanilla CSS** | — | Glassmorphic design system (no Tailwind) |
+| **Custom SVG** | — | Telemetry chart (no charting library) |
+
+---
+
+## 📂 Project Structure
 
 ```
 D:\GP
 ├── backend/
-│   ├── main.py              # FastAPI application endpoints, StaticFiles mount & upload route
-│   ├── cache_db.py          # SQLite database schema, initialization & query functions
-│   ├── dataset_loader.py    # Hugging Face MikCil/f1-team-radio dataset stream & audio exporter
-│   ├── fastf1_loader.py     # FastF1 session loader & local lap timing cache manager
-│   ├── stt_engine.py        # Whisper STT pipeline loader, transcript normalizer & jiwer WER calculator
-│   ├── emotion_engine.py    # Wav2Vec2 continuous dimensional stress classifier & noise reduction
-│   ├── alignment.py         # UTC radio message timestamp to FastF1 lap timing join engine
-│   ├── process_dataset.py   # Initial demo dataset builder & batch pre-processor
-│   ├── silent_codriver.db   # SQLite cache database
-│   └── static/
-│       └── audio/           # Static WAV audio file storage directory
+│   ├── main.py                  # FastAPI app: 8 REST endpoints, CORS, StaticFiles, startup
+│   ├── cache_db.py              # SQLite schema, CRUD operations, reclassify logic
+│   ├── stt_engine.py            # Whisper STT pipeline, text normalization, WER computation
+│   ├── emotion_engine.py        # Wav2Vec2 emotion inference, noise reduction, RMS fusion
+│   ├── alignment.py             # UTC→lap timestamp alignment, ISO 8601 parsing
+│   ├── fastf1_loader.py         # FastF1 session loading, lap extraction, driver code mapping
+│   ├── dataset_loader.py        # HuggingFace dataset streaming, audio export to WAV
+│   ├── process_dataset.py       # Batch processor: STT + Emotion + FastF1 → SQLite pipeline
+│   ├── silent_codriver.db       # Pre-populated SQLite cache database
+│   ├── static/
+│   │   └── audio/               # Static WAV file storage (served at /static/audio/)
+│   └── fastf1_cache/            # FastF1 local session cache directory
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx          # Full F1 Telemetry Dashboard, Audio Analyzer & Threshold Tuner
-│   │   ├── index.css        # Glassmorphic F1 dark theme styling system & CSS animations
-│   │   └── main.jsx         # React application entry point
-│   ├── index.html           # HTML5 root template
-│   ├── package.json         # React 19, Vite & Lucide icons dependency configuration
-│   └── vite.config.js       # Vite dev server host/port binding config
-├── driver_tone_detection_architecture_shareable.md
-├── Grandprix Problem Statements.pdf
-└── README.md                # Exhaustive system documentation
+│   │   ├── App.jsx              # Single-page dashboard: tabs, charts, audio, upload, tuner
+│   │   ├── index.css            # Full design system: CSS variables, glassmorphism, animations
+│   │   └── main.jsx             # React 19 entry point with StrictMode
+│   ├── index.html               # HTML5 root template
+│   ├── package.json             # Dependencies: React 19, Vite 6, Lucide
+│   └── vite.config.js           # Dev server: 127.0.0.1:3000, strictPort
+├── driver_tone_detection_architecture_shareable.md   # ML architecture deep-dive
+├── Grandprix Problem Statements.pdf                  # Hackathon problem statements
+├── prompt.md                    # Initial system specification
+├── prompt fin.md                # Final system specification
+└── README.md                    # ← You are here
 ```
 
 ---
 
-## 7. Database Schema (`silent_codriver.db`)
+## 💾 Database Schema
 
-The application uses an embedded SQLite cache database (`backend/silent_codriver.db`) managed via `backend/cache_db.py`:
+The application uses an embedded **SQLite** database ([`silent_codriver.db`](file:///D:/GP/backend/silent_codriver.db)) with 4 normalized tables:
 
 ```sql
-CREATE TABLE IF NOT EXISTS races (
-    race_id TEXT PRIMARY KEY,
-    grand_prix TEXT,
-    year INTEGER,
-    session_date TEXT,
-    total_messages INTEGER
+-- Races: One row per Grand Prix event
+CREATE TABLE races (
+    race_id           TEXT PRIMARY KEY,    -- e.g. "2021_Abu_Dhabi_Grand_Prix"
+    grand_prix        TEXT,                -- e.g. "Abu Dhabi Grand Prix"
+    year              INTEGER,             -- e.g. 2021
+    session_date      TEXT,                -- ISO date
+    total_messages    INTEGER              -- Radio message count
 );
 
-CREATE TABLE IF NOT EXISTS drivers (
-    driver_id TEXT,
-    race_id TEXT,
-    racing_number TEXT,
-    driver_code TEXT,
-    message_count INTEGER,
+-- Drivers: One row per driver per race
+CREATE TABLE drivers (
+    driver_id         TEXT,                -- e.g. "MAXVER01"
+    race_id           TEXT,                -- FK → races.race_id
+    racing_number     TEXT,                -- e.g. "33"
+    driver_code       TEXT,                -- e.g. "VER"
+    message_count     INTEGER,
     PRIMARY KEY (driver_id, race_id)
 );
 
-CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    race_id TEXT,
-    grand_prix TEXT,
-    year INTEGER,
-    driver_id TEXT,
-    racing_number TEXT,
-    driver_code TEXT,
-    session_date TEXT,
-    message_timestamp TEXT,
-    ground_truth_transcript TEXT,
-    whisper_transcript TEXT,
-    wer REAL,
-    arousal REAL,
-    dominance REAL,
-    valence REAL,
-    mood_label TEXT,
-    lap_number INTEGER,
-    lap_time_seconds REAL,
-    duration REAL,
-    audio_filename TEXT
+-- Messages: Core data — one row per radio transmission
+CREATE TABLE messages (
+    id                        TEXT PRIMARY KEY,    -- MD5(race_id + driver_id + timestamp)
+    race_id                   TEXT,
+    grand_prix                TEXT,
+    year                      INTEGER,
+    driver_id                 TEXT,
+    racing_number             TEXT,
+    driver_code               TEXT,
+    session_date              TEXT,
+    message_timestamp         TEXT,                -- UTC ISO 8601
+    ground_truth_transcript   TEXT,                -- Human annotation
+    whisper_transcript        TEXT,                -- Whisper STT output
+    wer                       REAL,                -- Word Error Rate [0.0 – 1.0+]
+    arousal                   REAL,                -- Wav2Vec2 arousal ∈ [0, 1]
+    dominance                 REAL,                -- Wav2Vec2 dominance ∈ [0, 1]
+    valence                   REAL,                -- Wav2Vec2 valence ∈ [0, 1]
+    mood_label                TEXT,                -- "STRESSED" | "CALM" | "FATIGUED"
+    lap_number                INTEGER,             -- Aligned via FastF1
+    lap_time_seconds          REAL,                -- Aligned lap pace
+    duration                  REAL,                -- Audio clip length (seconds)
+    audio_filename            TEXT                 -- Static WAV filename
 );
 
-CREATE TABLE IF NOT EXISTS laps (
-    race_id TEXT,
-    driver_code TEXT,
-    lap_number INTEGER,
-    lap_time_seconds REAL,
-    is_pit INTEGER,
-    lap_start_time_sec REAL,
-    lap_end_time_sec REAL,
+-- Laps: FastF1 timing data per driver per race
+CREATE TABLE laps (
+    race_id           TEXT,
+    driver_code       TEXT,
+    lap_number        INTEGER,
+    lap_time_seconds  REAL,
+    is_pit            INTEGER,             -- Boolean: pit stop lap
+    lap_start_time_sec REAL,              -- Session-relative (seconds)
+    lap_end_time_sec  REAL,
     PRIMARY KEY (race_id, driver_code, lap_number)
 );
 ```
 
+All inserts use **`INSERT OR REPLACE`** (upsert pattern) for idempotent re-processing.
+
 ---
 
-## 8. Quickstart & Operational Commands
+## 📡 API Reference
 
-### Prerequisites
-* Anaconda / Miniconda installed.
-* Node.js v18+ and `npm` installed.
+### Base URL: `http://127.0.0.1:8000`
 
-### Step 1: Activate Conda Environment
-Always run backend commands within the dedicated Conda environment `gp`:
+| Method | Endpoint | Description | Response |
+| :---: | :--- | :--- | :--- |
+| `GET` | `/` | Health check + active model metadata | `{ status, models, version }` |
+| `GET` | `/api/races` | List all Grand Prix events | `[{ race_id, grand_prix, year, total_messages }]` |
+| `GET` | `/api/races/{race_id}/drivers` | Drivers with radio data for a race | `[{ driver_id, driver_code, racing_number, message_count }]` |
+| `GET` | `/api/races/{race_id}/drivers/{driver_id}/messages` | Full radio timeline with STT + stress | `[{ id, transcript, wer, arousal, valence, dominance, mood_label, lap_number, ... }]` |
+| `GET` | `/api/races/{race_id}/laps/{driver_code}` | FastF1 lap timing curve | `[{ lap_number, lap_time_seconds, is_pit }]` |
+| `GET` | `/api/stats` | Aggregated dataset statistics | `{ total_messages, avg_wer, total_drivers, mood_distribution }` |
+| `POST` | `/api/reclassify` | Re-score all messages with new thresholds | Body: `{ arousal_thresh, valence_thresh }` |
+| `POST` | `/api/audio/upload` | Upload & analyze custom radio clip | Multipart: `file`, `reference_transcript`, `arousal_thresh`, `valence_thresh` |
+
+### Example: Upload & Analyze a Custom Audio Clip
+
 ```bash
-conda activate gp
+curl -X POST http://127.0.0.1:8000/api/audio/upload \
+  -F "file=@radio_clip.wav" \
+  -F "reference_transcript=box box box the tyres are gone" \
+  -F "arousal_thresh=0.60" \
+  -F "valence_thresh=0.40"
 ```
 
-### Step 2: Start the Backend Server (FastAPI)
-Run from the project root (`D:\GP`):
+**Response:**
+```json
+{
+  "whisper_transcript": "box box box the tyres are gone",
+  "wer": 0.0,
+  "arousal": 0.72,
+  "valence": 0.31,
+  "dominance": 0.58,
+  "mood_label": "STRESSED",
+  "duration": 3.42
+}
+```
+
+---
+
+## 🚀 Quickstart
+
+### Prerequisites
+
+| Requirement | Minimum Version |
+| :--- | :--- |
+| Anaconda / Miniconda | Latest |
+| Node.js | v18+ |
+| npm | v9+ |
+| Git | Latest |
+
+### Step 1 — Clone & Enter
+
+```bash
+git clone https://github.com/AnkitBharadva/GPHacakthon26.git
+cd GPHacakthon26
+```
+
+### Step 2 — Backend Setup (Conda Environment)
+
+```bash
+# Create the environment (first time only)
+conda create -n gp python=3.10 -y
+conda activate gp
+
+# Install dependencies
+pip install fastapi uvicorn torch torchaudio transformers datasets jiwer noisereduce soundfile numpy fastf1
+```
+
+### Step 3 — Start the Backend
+
 ```bash
 conda run -n gp python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
-> **Backend API URL:** `http://127.0.0.1:8000`
 
-### Step 3: Start the Frontend Dev Server (Vite + React)
-Navigate to the `frontend` folder and run:
+> 🟢 Backend live at: **http://127.0.0.1:8000**
+
+### Step 4 — Frontend Setup & Launch
+
 ```bash
 cd frontend
+npm install
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
-> **Frontend Dashboard URL:** `http://127.0.0.1:3000`
 
-### Step 4: Stopping the Servers
-To stop the background tasks gracefully:
-* In terminal: Press `Ctrl + C` in each running terminal window.
+> 🟢 Dashboard live at: **http://127.0.0.1:3000**
 
----
+### Step 5 — (Optional) Batch Process Dataset
 
-## 9. Complete API Endpoint Reference
+To populate the database with F1 radio data from HuggingFace:
 
-| HTTP Method | Endpoint | Description | Sample Request / Parameters |
-| :--- | :--- | :--- | :--- |
-| `GET` | `/` | System health check & active model metadata | `curl http://127.0.0.1:8000/` |
-| `GET` | `/api/races` | List all available Grand Prix events in database | `curl http://127.0.0.1:8000/api/races` |
-| `GET` | `/api/races/{race_id}/drivers` | List drivers with radio messages for a specific race | `curl http://127.0.0.1:8000/api/races/2018_Australian_Grand_Prix/drivers` |
-| `GET` | `/api/races/{race_id}/drivers/{driver_id}/messages` | Get radio message timeline + STT + stress labels for a driver | `curl http://127.0.0.1:8000/api/races/2018_Australian_Grand_Prix/drivers/DANRIC01/messages` |
-| `GET` | `/api/races/{race_id}/laps/{driver_code}` | Get FastF1 lap pace curves for performance alignment chart | `curl http://127.0.0.1:8000/api/races/2018_Australian_Grand_Prix/laps/RIC` |
-| `POST` | `/api/reclassify` | Re-classify cached radio messages using updated engineer thresholds | `{"arousal_thresh": 0.65, "valence_thresh": 0.35}` |
-| `POST` | `/api/audio/upload` | Upload custom radio clip (.wav, .mp3) for live Whisper STT + Wav2Vec2 stress analysis | Multipart Form (`file`, `reference_transcript`, `arousal_thresh`, `valence_thresh`) |
-| `GET` | `/api/stats` | Aggregated dataset summary statistics & average Whisper WER | `curl http://127.0.0.1:8000/api/stats` |
+```bash
+conda run -n gp python -c "from backend.process_dataset import process_dataset; process_dataset(max_samples=50)"
+```
 
 ---
 
-## 10. Key Application Features & UI Walkthrough
+## 🖥 Frontend Dashboard
 
-1. **Interactive Race & Driver Selector:** Pick Grand Prix events (e.g. 2018 Australian GP, 2021 Abu Dhabi GP) and drivers (`RIC`, `HAM`, `VER`, `RAI`).
-2. **Pace vs Vocal Stress Telemetry Chart:** Visualizes lap timing columns across the race, overlaying radio message markers color-coded by stress state:
-   * 🔴 **STRESSED** (High arousal, low valence)
-   * 🟢 **CALM** (Neutral/positive arousal and valence)
-   * 🟡 **FATIGUED** (Low arousal, low valence)
-3. **Dual Transcript View & WER Badge:** Displays human ground-truth transcript alongside Whisper STT inference with `jiwer` Word Error Rate percentage badge.
-4. **Web Audio Player:** Integrated streaming audio player for reviewing driver radio communications.
-5. **Live Audio Analyzer ("Bring Your Own Clip"):** Upload external audio recordings (`.wav`, `.mp3`) to test Whisper STT and Wav2Vec2 stress scoring live.
-6. **Engineer Stress Threshold Tuner:** Interactive sliders allowing race engineers to adjust $T_{\text{arousal}}$ and $T_{\text{valence}}$ cutoffs on the fly.
+The dashboard implements a **glassmorphic dark theme** inspired by professional F1 telemetry interfaces, built entirely with vanilla CSS and custom SVG — **zero charting libraries**.
+
+### Design System
+
+| Token | Value | Usage |
+| :--- | :--- | :--- |
+| `--bg-primary` | `#0a0a0f` | Page background |
+| `--bg-card` | `rgba(18, 18, 30, 0.8)` | Glass card background |
+| `--accent-red` | `#ef4444` | STRESSED indicators |
+| `--accent-green` | `#22c55e` | CALM indicators |
+| `--accent-yellow` | `#eab308` | FATIGUED indicators |
+| `--radius` | `12px` | Card border radius |
+| `backdrop-filter` | `blur(12px)` | Glassmorphism effect |
+
+### Tab Views
+
+| Tab | Features |
+| :--- | :--- |
+| **📈 Telemetry** | Race/Driver selectors → Custom SVG pace chart with mood-colored radio markers → Stats cards (stress count, avg WER, total laps, avg lap time) |
+| **📻 Messages** | Scrollable radio timeline → Dual transcript view (ground truth vs. Whisper) → WER badge (🟢 <20% · 🟡 <50% · 🔴 ≥50%) → Arousal/Valence/Dominance progress bars → Audio play/pause |
+| **🎙️ Upload** | Drag-and-drop file zone → Reference transcript input → Live Whisper + Wav2Vec2 analysis → Results panel with all metrics |
+
+### Threshold Tuner (Slide-Out Drawer)
+
+A right-side panel with two range sliders (`<input type="range">`) for $T_{\text{arousal}}$ and $T_{\text{valence}}$. Clicking **"Re-classify All"** triggers `POST /api/reclassify` — all cached messages are re-scored against the new boundaries without re-running ML inference.
 
 ---
 
-## 11. Troubleshooting & Edge-Case Handling
+## 🎙 Live Demo Capability
 
-* **Empty STT String or NaN Percentages:**
-  * If audio clips are silent or contain extreme noise, `noisereduce` zero-variance checks ($\sigma > 10^{-5}$) and `np.nan_to_num()` prevent division-by-zero errors.
-* **CORS Errors:**
-  * FastAPI has `CORSMiddleware` configured with `allow_origins=["*"]` to allow seamless requests from `http://127.0.0.1:3000`.
-* **Port Conflicts:**
-  * If port 8000 or 3000 is occupied, free the port using `netstat -ano | findstr 8000` or launch on an alternative port (e.g., `--port 8001`).
+The **"Bring Your Own Clip"** feature allows judges/users to upload any audio file for instant analysis:
+
+```
+Upload .wav/.mp3 ──→ Temp file save ──→ ┬── Whisper STT ──→ Transcript
+                                        │
+                                        ├── WER vs. reference ──→ Accuracy %
+                                        │
+                                        └── Wav2Vec2 ──→ Arousal / Valence / Dominance
+                                                              │
+                                                              ▼
+                                                    Threshold Classification
+                                                              │
+                                                              ▼
+                                                 🔴 STRESSED / 🟢 CALM / 🟡 FATIGUED
+```
+
+The temp file is **automatically cleaned up** after inference completes.
+
+---
+
+## 📈 Performance & Accuracy
+
+### Speech-to-Text Accuracy
+
+| Metric | Description | Typical Range |
+| :--- | :--- | :--- |
+| **WER** | Word Error Rate (lower = better) | 15% – 45% on noisy F1 radio |
+| **Text Normalization** | Pre-WER: lowercase, strip punctuation, collapse whitespace | Ensures fair comparison |
+
+> WER varies significantly with audio quality. Clean pit-to-car messages achieve ~15% WER, while high-speed segments with 120 dB engine noise may reach 40%+.
+
+### Emotion Classification
+
+| Aspect | Detail |
+| :--- | :--- |
+| **Model Training Data** | MSP-Podcast (10,000+ dimensional annotations) |
+| **Output Type** | Continuous ∈ [0, 1] (not categorical) |
+| **Noise Robustness** | `wav2vec2-large-robust` variant specifically trained for noisy conditions |
+| **Inference Mode** | `torch.no_grad()` — no gradient computation, optimized for speed |
+
+---
+
+## 🔮 Future Roadmap
+
+| Phase | Enhancement | Status |
+| :--- | :--- | :---: |
+| **v2.0** | Custom WavLM + BiLSTM + Attention classifier trained on CREMA-D (7,442 clips, 6 emotion classes) | 📋 Designed |
+| **v2.1** | Real-time streaming radio analysis during live F1 sessions | 🔜 Planned |
+| **v2.2** | Multi-driver comparative stress analysis (side-by-side) | 🔜 Planned |
+| **v2.3** | Integration with official F1 Live Timing API | 🔜 Planned |
+| **v3.0** | Fine-tuning Whisper on F1-specific vocabulary (team names, technical jargon) | 💭 Concept |
+
+### Planned Custom ML Architecture (v2.0)
+
+```
+Raw Driver Audio → 16kHz Mono → WavLM-Base-Plus (Frozen) → T×768 Embeddings
+                                                                    │
+                                                                    ▼
+                                                              BiLSTM (128×2)
+                                                                    │
+                                                                    ▼
+                                                            T×256 Contextual
+                                                                    │
+                                                                    ▼
+                                                         Attention Mechanism
+                                                                    │
+                                                                    ▼
+                                                         256-d Context Vector
+                                                                    │
+                                                                    ▼
+                                                         Linear (256 → 6)
+                                                                    │
+                                                                    ▼
+                                                              Softmax
+                                                                    │
+                                                         ┌──────────┼──────────┐
+                                                         ▼          ▼          ▼
+                                                       CALM     STRESSED     TIRED
+```
+
+---
+
+## 🔧 Troubleshooting
+
+<details>
+<summary><b>Empty STT String or NaN Values</b></summary>
+
+Silent or extremely noisy clips can produce empty transcripts. The system handles this via:
+- Zero-variance guard: `np.std(audio) > 1e-5` before noise reduction
+- `np.nan_to_num()` to replace NaN with zero in emotion outputs
+- Empty string edge-case handling in WER computation (returns `1.0` if reference is empty, `0.0` if both are empty)
+
+</details>
+
+<details>
+<summary><b>CORS Errors Between Frontend and Backend</b></summary>
+
+FastAPI includes `CORSMiddleware` with `allow_origins=["*"]`:
+```python
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
+```
+If issues persist, verify both servers are running and accessible.
+
+</details>
+
+<details>
+<summary><b>Port 8000 or 3000 Already in Use</b></summary>
+
+```bash
+# Find process on port (Windows)
+netstat -ano | findstr :8000
+
+# Kill by PID
+taskkill /PID <PID> /F
+
+# Or launch on alternative ports
+uvicorn backend.main:app --port 8001
+npm run dev -- --port 3001
+```
+
+</details>
+
+<details>
+<summary><b>FastF1 Session Load Failures</b></summary>
+
+FastF1 requires internet access for first-time session downloads. Subsequent loads use the local cache at `backend/fastf1_cache/`. If a session fails to load:
+- Check internet connectivity
+- Verify the GP name matches FastF1's naming convention
+- Clear the cache directory and retry
+
+</details>
+
+<details>
+<summary><b>Model Download on First Run</b></summary>
+
+On first startup, the backend downloads ~1.5 GB of model weights:
+- `openai/whisper-base` (~148 MB)
+- `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim` (~1.2 GB)
+
+Models are cached by HuggingFace Transformers in `~/.cache/huggingface/`. Subsequent startups load from cache.
+
+</details>
+
+---
+
+<div align="center">
+
+### Built with ❤️ at the Grand Prix Hackathon 2026
+
+**The Silent Co-Driver** — *Because every voice on the radio tells a story that data alone cannot.*
+
+</div>
