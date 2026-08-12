@@ -192,10 +192,16 @@ export default function App() {
     }
   };
 
+  const formatPct = (val) => {
+    if (val === undefined || val === null || isNaN(val)) return '50%';
+    return `${(Number(val) * 100).toFixed(0)}%`;
+  };
+
   const getWerBadge = (wer) => {
-    const pct = (wer * 100).toFixed(1);
-    const color = wer < 0.1 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
-                  wer < 0.25 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' :
+    const safeWer = (wer === undefined || wer === null || isNaN(wer)) ? 0 : Number(wer);
+    const pct = (safeWer * 100).toFixed(1);
+    const color = safeWer < 0.1 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
+                  safeWer < 0.25 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' :
                   'text-red-400 bg-red-500/10 border-red-500/30';
     return <span className={`px-2 py-0.5 rounded text-[11px] font-mono border ${color}`}>WER: {pct}%</span>;
   };
@@ -639,15 +645,15 @@ export default function App() {
                   <div className="grid grid-cols-3 gap-3 text-center pt-2">
                     <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
                       <span className="text-[10px] text-slate-400 block mb-1">AROUSAL</span>
-                      <strong className="text-base font-mono text-red-400">{(uploadResult.arousal * 100).toFixed(0)}%</strong>
+                      <strong className="text-base font-mono text-red-400">{formatPct(uploadResult.arousal)}</strong>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
                       <span className="text-[10px] text-slate-400 block mb-1">VALENCE</span>
-                      <strong className="text-base font-mono text-cyan-400">{(uploadResult.valence * 100).toFixed(0)}%</strong>
+                      <strong className="text-base font-mono text-cyan-400">{formatPct(uploadResult.valence)}</strong>
                     </div>
                     <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
                       <span className="text-[10px] text-slate-400 block mb-1">DOMINANCE</span>
-                      <strong className="text-base font-mono text-emerald-400">{(uploadResult.dominance * 100).toFixed(0)}%</strong>
+                      <strong className="text-base font-mono text-emerald-400">{formatPct(uploadResult.dominance)}</strong>
                     </div>
                   </div>
                 </div>

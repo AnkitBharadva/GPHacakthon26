@@ -89,6 +89,10 @@ Thumbs.db
 *.ogg
 *.m4a
 
+# Prompt files
+prompt.md
+prompt fin.md
+
 # PDF files (if they're documentation you don't want in repo)
 # Uncomment if needed
 # *.pdf
@@ -101,3 +105,4 @@ Thumbs.db
 WhatsApp Image 2026-08-10 at 2.45.49 PM.jpeg
 Grandprix Problem Statements.pdf
 maxie.jpg
+driver_tone_detection_architecture_shareable.md

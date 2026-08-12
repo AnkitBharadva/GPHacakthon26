@@ -54,10 +54,14 @@ def transcribe_audio(audio_array: np.ndarray, sampling_rate: int = 16000) -> str
         return "[Whisper pipeline offline]"
     
     try:
-        # Ensure float32 array
-        audio_inputs = audio_array.astype(np.float32)
+        # Clean NaNs and ensure float32 array
+        audio_inputs = np.nan_to_num(audio_array).astype(np.float32)
+        if len(audio_inputs) == 0:
+            return "[No audio data]"
         result = pipe({"raw": audio_inputs, "sampling_rate": sampling_rate}, generate_kwargs={"language": "english"})
-        return result.get("text", "").strip()
+        text = result.get("text", "").strip()
+        return text if text else "[Audio processed - low/no clear speech detected]"
     except Exception as e:
         print(f"[STT] Transcription failed: {e}")
         return f"[Transcription error: {e}]"
+

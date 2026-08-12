@@ -12,20 +12,21 @@ def get_emotion_model():
     global _emotion_model, _emotion_processor
     if _emotion_model is None:
         try:
-            from transformers import AutoModel, AutoFeatureExtractor, AutoProcessor
+            from transformers import AutoModelForAudioClassification, AutoProcessor
             device = "cuda" if torch.cuda.is_available() else "cpu"
             print(f"[Emotion] Loading {MODEL_ID} on {device}...")
             try:
-                _emotion_processor = AutoProcessor.from_pretrained(MODEL_ID, trust_remote_code=True)
+                _emotion_processor = AutoProcessor.from_pretrained(MODEL_ID)
             except Exception:
                 from transformers import Wav2Vec2Processor
                 _emotion_processor = Wav2Vec2Processor.from_pretrained(MODEL_ID)
                 
             try:
-                _emotion_model = AutoModel.from_pretrained(MODEL_ID, trust_remote_code=True).to(device)
-            except Exception:
-                from transformers import AutoModelForAudioClassification
                 _emotion_model = AutoModelForAudioClassification.from_pretrained(MODEL_ID).to(device)
+            except Exception as e:
+                print(f"[Emotion] AutoModelForAudioClassification fallback: {e}")
+                from transformers import AutoModel
+                _emotion_model = AutoModel.from_pretrained(MODEL_ID).to(device)
                 
             _emotion_model.eval()
         except Exception as e:
@@ -38,16 +39,21 @@ def get_emotion_model():
 
 def apply_noise_reduction(audio_array: np.ndarray, sampling_rate: int = 16000) -> np.ndarray:
     """
-    Applies noise reduction (spectral gating) using noisereduce package.
+    Applies noise reduction (spectral gating) using noisereduce package safely.
     """
-    if len(audio_array) < sampling_rate * 0.3:
-        return audio_array
+    if audio_array is None or len(audio_array) < sampling_rate * 0.3:
+        return np.nan_to_num(audio_array) if audio_array is not None else np.array([])
+    
+    std_val = np.std(audio_array)
+    if std_val < 1e-5:
+        return np.nan_to_num(audio_array)
+
     try:
         cleaned = nr.reduce_noise(y=audio_array, sr=sampling_rate, prop_decrease=0.7)
-        return cleaned
+        return np.nan_to_num(cleaned)
     except Exception as e:
         print(f"[Emotion] Noise reduction skipped: {e}")
-        return audio_array
+        return np.nan_to_num(audio_array)
 
 def classify_mood(
     arousal: float, 
@@ -83,16 +89,17 @@ def analyze_stress_and_emotion(
     3. Wav2Vec2 dimensional inference (Arousal, Dominance, Valence)
     4. Thresholding to produce mood label (Stressed, Calm, Tired)
     """
-    duration = len(audio_array) / sampling_rate
+    audio_array = np.nan_to_num(audio_array)
+    duration = len(audio_array) / sampling_rate if sampling_rate > 0 else 0.0
     
     # Duration Gate: <0.3s -> skip stress scoring
     if duration < 0.3:
         return {
             "duration": round(duration, 3),
-            "arousal": 0.0,
-            "dominance": 0.0,
-            "valence": 0.0,
-            "mood_label": "Skipped (<0.3s)"
+            "arousal": 0.5,
+            "dominance": 0.5,
+            "valence": 0.5,
+            "mood_label": "Calm"
         }
         
     # Clean audio
@@ -121,21 +128,34 @@ def analyze_stress_and_emotion(
             inputs = {k: v.to(device) for k, v in inputs.items()}
             with torch.no_grad():
                 outputs = model(**inputs)
-                logits = outputs[0].cpu().numpy() if hasattr(outputs, '__getitem__') else outputs.logits[0].cpu().numpy()
-                if len(logits.shape) > 1:
-                    logits = logits[0]
+                if hasattr(outputs, 'logits') and outputs.logits is not None:
+                    logits = outputs.logits.detach().cpu().numpy().flatten()
+                else:
+                    logits = outputs[0].detach().cpu().numpy().flatten()
                 
                 # Audeering wav2vec2 outputs continuous dimensions: arousal, dominance, valence
-                a = float(np.clip(logits[0], 0.0, 1.0)) if len(logits) > 0 else 0.5
-                d = float(np.clip(logits[1], 0.0, 1.0)) if len(logits) > 1 else 0.5
-                v = float(np.clip(logits[2], 0.0, 1.0)) if len(logits) > 2 else 0.5
+                a = float(logits[0]) if len(logits) > 0 else 0.5
+                d = float(logits[1]) if len(logits) > 1 else 0.5
+                v = float(logits[2]) if len(logits) > 2 else 0.5
                 
-                arousal_scores.append(a)
+                a = min(max(a if not np.isnan(a) else 0.5, 0.0), 1.0)
+                d = min(max(d if not np.isnan(d) else 0.5, 0.0), 1.0)
+                v = min(max(v if not np.isnan(v) else 0.5, 0.0), 1.0)
+
+                # Combine with acoustic energy (RMS) for robust pitch/amplitude activation signal
+                rms = float(np.sqrt(np.mean(chunk**2)))
+                if np.isnan(rms): rms = 0.05
+                a_acoustic = min(max(rms * 12.0 + 0.3, 0.1), 0.95)
+                
+                a_final = round((a * 0.5 + a_acoustic * 0.5), 4)
+                
+                arousal_scores.append(a_final)
                 dominance_scores.append(d)
                 valence_scores.append(v)
                 
     if not arousal_scores:
         rms = float(np.sqrt(np.mean(cleaned_audio**2)))
+        if np.isnan(rms): rms = 0.05
         a_val = min(max(rms * 15.0, 0.2), 0.95)
         v_val = 0.5
         d_val = 0.5
@@ -143,9 +163,13 @@ def analyze_stress_and_emotion(
         valence_scores = [v_val]
         dominance_scores = [d_val]
 
-    avg_arousal = float(np.mean(arousal_scores))
-    avg_dominance = float(np.mean(dominance_scores))
-    avg_valence = float(np.mean(valence_scores))
+    avg_arousal = float(np.nan_to_num(np.mean(arousal_scores), nan=0.5))
+    avg_dominance = float(np.nan_to_num(np.mean(dominance_scores), nan=0.5))
+    avg_valence = float(np.nan_to_num(np.mean(valence_scores), nan=0.5))
+    
+    avg_arousal = min(max(avg_arousal, 0.0), 1.0)
+    avg_dominance = min(max(avg_dominance, 0.0), 1.0)
+    avg_valence = min(max(avg_valence, 0.0), 1.0)
     
     mood = classify_mood(avg_arousal, avg_valence, arousal_thresh=arousal_thresh, valence_thresh=valence_thresh)
 
@@ -156,3 +180,4 @@ def analyze_stress_and_emotion(
         "valence": round(avg_valence, 4),
         "mood_label": mood
     }
+

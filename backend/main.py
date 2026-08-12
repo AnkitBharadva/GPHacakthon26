@@ -135,16 +135,21 @@ async def upload_audio_clip(
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        # Read audio array with soundfile / librosa
-        audio_data, sr = sf.read(temp_path)
-        if len(audio_data.shape) > 1:
-            audio_data = np.mean(audio_data, axis=1) # stereo to mono
-            
-        # Resample to 16000Hz if needed
-        if sr != 16000:
+        # Read audio array with librosa or soundfile safely
+        try:
             import librosa
-            audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=16000)
-            sr = 16000
+            audio_data, sr = librosa.load(temp_path, sr=16000, mono=True)
+        except Exception as read_err:
+            print(f"[Upload] librosa.load fallback: {read_err}")
+            audio_data, sr = sf.read(temp_path)
+            if len(audio_data.shape) > 1:
+                audio_data = np.mean(audio_data, axis=1) # stereo to mono
+            if sr != 16000:
+                import librosa
+                audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=16000)
+                sr = 16000
+                
+        audio_data = np.nan_to_num(audio_data)
 
         # Save to static audio directory for web player
         save_filename = f"live_{file.filename}.wav"
