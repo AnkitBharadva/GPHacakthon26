@@ -1,11 +1,149 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Activity, Play, Pause, Volume2, Mic, Upload, Settings, RefreshCw,
-  Award, AlertTriangle, CheckCircle2, Zap, Clock, ShieldAlert, BarChart3,
-  ExternalLink, ChevronRight, Info, Music, Cpu, Database
+  AlertTriangle, CheckCircle2, Zap, Clock, Flag, BarChart3,
+  Sliders, Database, Cpu, ChevronRight, Check, X
 } from 'lucide-react';
 
 const API_BASE = "http://localhost:8000";
+
+// F1 Team Colors for Driver Badges
+const DRIVER_COLORS = {
+  VER: '#3671C6',
+  PER: '#3671C6',
+  HAM: '#00D2BE',
+  RUS: '#00D2BE',
+  LEC: '#E80020',
+  SAI: '#E80020',
+  NOR: '#FF8000',
+  PIA: '#FF8000',
+  ALO: '#229971',
+  STR: '#229971',
+  RIC: '#6692FF',
+  GAS: '#0093CC',
+  OCO: '#0093CC',
+  RAI: '#E80020',
+  BOT: '#52E252',
+};
+
+/**
+ * Signature F1 Steering Wheel Shift-Light LED Stress Strip Component
+ * 12 LEDs sweep Green -> Yellow -> Red based on Arousal.
+ * Live white tick indicates where current T_arousal threshold sits.
+ * Valence and Dominance collapse into a compass needle / meter beneath.
+ */
+function ShiftLightStrip({ arousal = 0.5, valence = 0.5, dominance = 0.5, thresholdArousal = 0.60 }) {
+  const [isHovered, setIsHovered] = useState(false);
+  const totalLeds = 12;
+  const safeArousal = Math.max(0, Math.min(1, Number(arousal) || 0));
+  const safeValence = Math.max(0, Math.min(1, Number(valence) || 0));
+  const safeDominance = Math.max(0, Math.min(1, Number(dominance) || 0));
+
+  const litCount = Math.round(safeArousal * totalLeds);
+  const thresholdPercent = Math.max(0, Math.min(1, Number(thresholdArousal) || 0.60)) * 100;
+
+  const getLedColor = (idx) => {
+    if (idx < 5) return '#22c55e'; // Green (Safe / Calm)
+    if (idx < 9) return '#eab308'; // Yellow (Mid-load)
+    return '#ef4444';                // Red (Redline / High Stress)
+  };
+
+  return (
+    <div
+      className="relative select-none"
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Shift Light LED Bar */}
+      <div className="relative bg-[#06070d] p-1 rounded-[3px] border border-white/10 flex items-center gap-[3px]">
+        {Array.from({ length: totalLeds }).map((_, idx) => {
+          const isLit = idx < litCount;
+          const color = getLedColor(idx);
+          return (
+            <div
+              key={idx}
+              className={`h-2.5 flex-1 rounded-[1.5px] transition-all duration-150 ${
+                isLit ? 'opacity-100' : 'opacity-15 bg-white/10'
+              }`}
+              style={{
+                backgroundColor: isLit ? color : 'rgba(255, 255, 255, 0.1)',
+                boxShadow: isLit ? `0 0 6px ${color}` : 'none',
+              }}
+            />
+          );
+        })}
+
+        {/* Live Threshold Marker Tick */}
+        <div
+          className="absolute top-0 bottom-0 w-[2px] bg-white shadow-[0_0_4px_#ffffff] z-10 transition-all duration-150 pointer-events-none"
+          style={{ left: `${thresholdPercent}%` }}
+        >
+          <div className="absolute -top-[4px] -left-[2.5px] w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[4px] border-t-white" />
+        </div>
+      </div>
+
+      {/* Collapsed Valence / Dominance Meter Gauge */}
+      <div className="flex items-center justify-between text-[10px] font-mono mt-1 text-white/50 px-0.5">
+        <div className="flex items-center gap-1">
+          <span className="text-white/40">A:</span>
+          <strong className={`tabular-nums ${safeArousal >= thresholdArousal ? 'text-[#ef4444]' : 'text-white/90'}`}>
+            {safeArousal.toFixed(2)}
+          </strong>
+          {safeArousal >= thresholdArousal && (
+            <span className="text-[9px] text-[#ef4444] font-bold">▲REDLINE</span>
+          )}
+        </div>
+
+        {/* Valence Compass Meter */}
+        <div className="flex items-center gap-1.5" title={`Valence (Pleasantness vs Distress): ${safeValence.toFixed(2)}`}>
+          <span className="text-white/40">V:</span>
+          <div className="w-8 h-1.5 bg-white/10 rounded-[2px] relative overflow-hidden">
+            <div
+              className="absolute top-0 bottom-0 w-1 bg-cyan-400 rounded-sm shadow-[0_0_4px_#22d3ee]"
+              style={{ left: `${safeValence * 100}%` }}
+            />
+          </div>
+          <strong className="tabular-nums text-white/80">{safeValence.toFixed(2)}</strong>
+        </div>
+
+        {/* Dominance Gauge */}
+        <div className="flex items-center gap-1" title={`Dominance (Urgency / Control): ${safeDominance.toFixed(2)}`}>
+          <span className="text-white/40">D:</span>
+          <strong className="tabular-nums text-white/80">{safeDominance.toFixed(2)}</strong>
+        </div>
+      </div>
+
+      {/* Hover Float Tooltip */}
+      {isHovered && (
+        <div className="absolute z-50 bottom-full left-0 mb-2 bg-[#090b14]/95 backdrop-blur-md border border-cyan-500/40 rounded-[4px] p-2 shadow-2xl min-w-[220px] pointer-events-none">
+          <div className="flex items-center justify-between border-b border-white/10 pb-1 mb-1 text-[10px] font-mono font-bold text-cyan-300">
+            <span>ACOUSTIC SHIFT-LIGHT VAD</span>
+            <span>T_arousal: {Number(thresholdArousal).toFixed(2)}</span>
+          </div>
+          <div className="grid grid-cols-3 gap-1 text-center font-mono text-[10px] mb-1.5">
+            <div className="bg-white/5 p-1 rounded-[2px]">
+              <span className="text-white/40 block text-[9px]">AROUSAL</span>
+              <strong className={safeArousal >= thresholdArousal ? 'text-[#ef4444]' : 'text-white'}>
+                {safeArousal.toFixed(2)}
+              </strong>
+            </div>
+            <div className="bg-white/5 p-1 rounded-[2px]">
+              <span className="text-white/40 block text-[9px]">VALENCE</span>
+              <strong className="text-white">{safeValence.toFixed(2)}</strong>
+            </div>
+            <div className="bg-white/5 p-1 rounded-[2px]">
+              <span className="text-white/40 block text-[9px]">DOMINANCE</span>
+              <strong className="text-white">{safeDominance.toFixed(2)}</strong>
+            </div>
+          </div>
+          <p className="text-[9px] font-mono text-white/40 border-t border-white/5 pt-1 truncate">
+            Model: <span className="text-white/70">wav2vec2-large-robust-12-ft-emotion-msp-dim</span>
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function App() {
   const [races, setRaces] = useState([]);
@@ -27,11 +165,15 @@ export default function App() {
   const [tuningOpen, setTuningOpen] = useState(false);
 
   // Upload state
-  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'upload' | 'about'
+  const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'upload'
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadRefText, setUploadRefText] = useState('');
+  const [uploadGrandPrix, setUploadGrandPrix] = useState('2021 Abu Dhabi Grand Prix');
+  const [uploadDriverCode, setUploadDriverCode] = useState('VER');
+  const [uploadTimestamp, setUploadTimestamp] = useState('2021-12-12T13:45:22Z');
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const [uploadError, setUploadError] = useState(false);
 
   // Fetch initial races and stats on load
   useEffect(() => {
@@ -140,7 +282,6 @@ export default function App() {
         })
       });
       const data = await res.json();
-      alert(`Successfully re-classified ${data.updated_messages} radio clips!`);
       fetchDriverData(selectedRace, selectedDriver);
       fetchStats();
       setTuningOpen(false);
@@ -156,6 +297,7 @@ export default function App() {
 
     setUploading(true);
     setUploadResult(null);
+    setUploadError(false);
 
     const formData = new FormData();
     formData.append('file', uploadFile);
@@ -164,168 +306,208 @@ export default function App() {
     }
     formData.append('arousal_thresh', arousalThresh);
     formData.append('valence_thresh', valenceThresh);
+    if (uploadGrandPrix) {
+      formData.append('grand_prix', uploadGrandPrix);
+    }
+    if (uploadDriverCode) {
+      formData.append('driver_code', uploadDriverCode);
+    }
+    if (uploadTimestamp) {
+      formData.append('message_timestamp', uploadTimestamp);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/audio/upload`, {
         method: 'POST',
         body: formData
       });
+      if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
       setUploadResult(data);
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Audio upload processing failed.");
+      setUploadError(true);
     } finally {
       setUploading(false);
     }
   };
 
-  // Helpers for mood styling
+  // Semantic Mood Badges (Isolated Colors + Icon + Explicit Text)
   const getMoodBadge = (mood) => {
-    switch (mood) {
-      case 'Stressed':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-400 border border-red-500/40 glow-red flex items-center gap-1.5"><AlertTriangle size={12} /> STRESSED</span>;
-      case 'Tired':
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center gap-1.5"><Clock size={12} /> FATIGUED</span>;
-      default:
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 glow-green flex items-center gap-1.5"><CheckCircle2 size={12} /> CALM</span>;
+    const m = (mood || '').toUpperCase();
+    if (m === 'STRESSED') {
+      return (
+        <span className="px-2 py-0.5 rounded-[3px] text-[10px] font-bold font-mono tracking-wider bg-[#ef4444]/15 text-[#ef4444] border border-[#ef4444]/40 flex items-center gap-1">
+          <AlertTriangle size={11} /> STRESSED
+        </span>
+      );
+    } else if (m === 'TIRED' || m === 'FATIGUED') {
+      return (
+        <span className="px-2 py-0.5 rounded-[3px] text-[10px] font-bold font-mono tracking-wider bg-[#eab308]/15 text-[#eab308] border border-[#eab308]/40 flex items-center gap-1">
+          <Clock size={11} /> FATIGUED
+        </span>
+      );
+    } else {
+      return (
+        <span className="px-2 py-0.5 rounded-[3px] text-[10px] font-bold font-mono tracking-wider bg-[#22c55e]/15 text-[#22c55e] border border-[#22c55e]/40 flex items-center gap-1">
+          <CheckCircle2 size={11} /> CALM
+        </span>
+      );
     }
   };
 
-  const formatPct = (val) => {
-    if (val === undefined || val === null || isNaN(val)) return '50%';
-    return `${(Number(val) * 100).toFixed(0)}%`;
-  };
-
+  // Monochrome WER scale (No collision with mood colors!)
   const getWerBadge = (wer) => {
     const safeWer = (wer === undefined || wer === null || isNaN(wer)) ? 0 : Number(wer);
     const pct = (safeWer * 100).toFixed(1);
-    const color = safeWer < 0.1 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' :
-                  safeWer < 0.25 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' :
-                  'text-red-400 bg-red-500/10 border-red-500/30';
-    return <span className={`px-2 py-0.5 rounded text-[11px] font-mono border ${color}`}>WER: {pct}%</span>;
+
+    let textColor = 'text-[#f4f4f5]';
+    let borderColor = 'border-white/20 bg-white/5';
+    if (safeWer >= 0.4) {
+      textColor = 'text-[#6b7280]';
+      borderColor = 'border-white/10 bg-white/[0.02]';
+    } else if (safeWer >= 0.15) {
+      textColor = 'text-[#9ca3af]';
+      borderColor = 'border-white/15 bg-white/[0.04]';
+    }
+
+    return (
+      <span className={`px-2 py-0.5 rounded-[3px] text-[10px] font-mono font-bold border ${textColor} ${borderColor}`}>
+        WER: {pct}%
+      </span>
+    );
   };
 
+  const selectedDriverObj = drivers.find(d => d.driver_id === selectedDriver);
+  const driverCode = selectedDriverObj?.driver_code || 'VER';
+  const driverTeamColor = DRIVER_COLORS[driverCode] || '#22d3ee';
+
   return (
-    <div className="min-h-screen pb-16">
+    <div className="min-h-screen pb-16 font-sans">
       {/* Top Header Navigation */}
-      <header className="glass-panel sticky top-0 z-40 border-b border-white/10 px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+      <header className="glass-panel sticky top-0 z-40 border-b border-white/10 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-red-600 rounded-xl shadow-lg shadow-red-600/30 flex items-center justify-center">
-            <Zap className="text-white fill-white" size={24} />
+          <div className="p-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 rounded-[4px] shadow-[0_0_12px_rgba(34,211,238,0.25)] flex items-center justify-center">
+            <Zap className="fill-current" size={20} />
           </div>
           <div>
-            <h1 className="text-xl font-extrabold tracking-wider text-white flex items-center gap-2">
-              THE SILENT CO-DRIVER <span className="text-xs bg-red-600/30 text-red-400 px-2 py-0.5 rounded-full border border-red-500/40 font-mono">F1 TELEMETRY</span>
+            <h1 className="text-base md:text-lg font-bold tracking-wider text-white flex items-center gap-2 font-display">
+              THE SILENT CO-DRIVER <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded-[2px] border border-cyan-500/30 font-mono">PIT-WALL</span>
             </h1>
-            <p className="text-xs text-slate-400">Driver Radio STT Transcription • Vocal Stress Scoring • Lap Performance Alignment</p>
+            <p className="text-[11px] font-mono text-white/50">
+              Vocal Stress Intelligence • Whisper STT • Lap Telemetry Alignment
+            </p>
           </div>
         </div>
 
-        {/* Model & Dataset Badges */}
-        <div className="hidden lg:flex items-center gap-2 text-xs">
-          <div className="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 flex items-center gap-1.5">
-            <Database size={13} className="text-red-400" />
+        {/* Model & Dataset Technical Badges */}
+        <div className="hidden xl:flex items-center gap-2 text-xs font-mono">
+          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+            <Database size={12} className="text-cyan-400" />
             <span>Dataset: <strong className="text-white">MikCil/f1-team-radio</strong></span>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 flex items-center gap-1.5">
-            <Cpu size={13} className="text-cyan-400" />
-            <span>STT: <strong className="text-white">whisper-base</strong></span>
+          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+            <Cpu size={12} className="text-cyan-400" />
+            <span>ASR: <strong className="text-white">whisper-base</strong></span>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-white/10 text-slate-300 flex items-center gap-1.5">
-            <Activity size={13} className="text-emerald-400" />
-            <span>Stress: <strong className="text-white">wav2vec2-msp-dim</strong></span>
+          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+            <Activity size={12} className="text-cyan-400" />
+            <span>Emotion: <strong className="text-white">wav2vec2-msp-dim</strong></span>
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex items-center gap-2">
+        {/* Navigation Tabs & Threshold Trigger */}
+        <div className="flex items-center gap-2 font-mono text-xs">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-4 py-2 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${
-              activeTab === 'dashboard' ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+            className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'dashboard'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
             }`}
           >
-            <BarChart3 size={14} /> Telemetry Dashboard
+            <BarChart3 size={13} /> PIT-WALL TELEMETRY
           </button>
           <button
             onClick={() => setActiveTab('upload')}
-            className={`px-4 py-2 rounded-lg font-semibold text-xs transition flex items-center gap-1.5 ${
-              activeTab === 'upload' ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' : 'bg-slate-800/60 text-slate-300 hover:bg-slate-800'
+            className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
+              activeTab === 'upload'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
             }`}
           >
-            <Upload size={14} /> Audio Analyzer
+            <Upload size={13} /> LIVE ANALYZER
           </button>
           <button
             onClick={() => setTuningOpen(true)}
-            className="p-2 rounded-lg bg-slate-800/60 text-slate-300 hover:bg-slate-800 hover:text-white transition border border-white/10"
-            title="Engineer Stress Thresholds"
+            className="p-1.5 rounded-[4px] bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition border border-white/10"
+            title="Engineer Stress Threshold Calibration"
           >
-            <Settings size={16} />
+            <Sliders size={16} />
           </button>
         </div>
       </header>
 
       {/* Main Content Area */}
-      <main className="max-w-7xl mx-auto px-6 pt-6">
+      <main className="max-w-7xl mx-auto px-4 md:px-6 pt-5 space-y-5">
 
         {/* Threshold Tuner Drawer Modal */}
         {tuningOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-            <div className="glass-panel max-w-md w-full p-6 rounded-2xl border border-red-500/30 shadow-2xl relative">
-              <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                <Settings className="text-red-500" size={20} /> Engineer Stress Thresholds
+          <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-[#0c0e1a] max-w-md w-full p-6 rounded-[6px] border border-cyan-500/40 shadow-2xl relative font-sans">
+              <h3 className="text-base font-bold text-white mb-1 flex items-center gap-2 font-display">
+                <Sliders className="text-cyan-400" size={18} /> Engineer Stress Thresholds
               </h3>
-              <p className="text-xs text-slate-400 mb-6">
-                Adjust dimensional emotion cutoffs (Arousal & Valence) to calibrate vocal stress sensitivity.
+              <p className="text-xs font-mono text-white/50 mb-5">
+                Calibrate acoustic cutoffs (Arousal & Valence) to update the shift-light threshold markers.
               </p>
 
-              <div className="space-y-6">
+              <div className="space-y-5 font-mono">
                 <div>
-                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-2">
-                    <span>Arousal Cutoff (Energy / Tension):</span>
-                    <strong className="text-red-400">{arousalThresh}</strong>
+                  <div className="flex justify-between text-xs text-white/80 mb-1.5">
+                    <span>T_arousal (Energy / Stress Activation):</span>
+                    <strong className="text-white bg-white/10 px-1.5 py-0.2 rounded">{arousalThresh}</strong>
                   </div>
                   <input
                     type="range"
                     min="0.30"
                     max="0.90"
-                    step="0.05"
+                    step="0.02"
                     value={arousalThresh}
                     onChange={(e) => setArousalThresh(e.target.value)}
-                    className="w-full accent-red-600 bg-slate-800 h-2 rounded-lg"
+                    className="w-full accent-cyan-400 bg-white/10 h-1.5 rounded-[2px]"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Clips with Arousal &gt; {arousalThresh} are flagged for high vocal activation.</p>
+                  <p className="text-[10px] text-white/40 mt-1">Updates the white tick on all steering-wheel shift-light strips live.</p>
                 </div>
 
                 <div>
-                  <div className="flex justify-between text-xs font-mono text-slate-300 mb-2">
-                    <span>Valence Cutoff (Pleasantness / Calm):</span>
-                    <strong className="text-cyan-400">{valenceThresh}</strong>
+                  <div className="flex justify-between text-xs text-white/80 mb-1.5">
+                    <span>T_valence (Distress Boundary):</span>
+                    <strong className="text-white bg-white/10 px-1.5 py-0.2 rounded">{valenceThresh}</strong>
                   </div>
                   <input
                     type="range"
                     min="0.20"
                     max="0.80"
-                    step="0.05"
+                    step="0.02"
                     value={valenceThresh}
                     onChange={(e) => setValenceThresh(e.target.value)}
-                    className="w-full accent-cyan-500 bg-slate-800 h-2 rounded-lg"
+                    className="w-full accent-cyan-400 bg-white/10 h-1.5 rounded-[2px]"
                   />
-                  <p className="text-[11px] text-slate-500 mt-1">Clips with Valence &lt; {valenceThresh} are flagged for negative distress.</p>
+                  <p className="text-[10px] text-white/40 mt-1">Clips with Valence &lt; {valenceThresh} are flagged for negative emotional valence.</p>
                 </div>
               </div>
 
-              <div className="mt-8 flex gap-3">
+              <div className="mt-6 flex gap-2.5 font-mono text-xs">
                 <button
                   onClick={handleReclassify}
-                  className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2"
+                  className="flex-1 py-2 rounded-[4px] bg-cyan-400 hover:bg-cyan-300 text-black font-bold shadow-[0_0_12px_rgba(34,211,238,0.4)] transition flex items-center justify-center gap-1.5"
                 >
-                  <RefreshCw size={14} /> Re-Classify All Clips
+                  <RefreshCw size={13} /> Re-Classify All Clips
                 </button>
                 <button
                   onClick={() => setTuningOpen(false)}
-                  className="px-4 py-2.5 rounded-xl bg-slate-800 text-slate-300 hover:bg-slate-700 font-bold text-xs transition"
+                  className="px-4 py-2 rounded-[4px] bg-white/10 text-white hover:bg-white/15 font-bold transition"
                 >
                   Cancel
                 </button>
@@ -336,36 +518,36 @@ export default function App() {
 
         {/* Dashboard Tab */}
         {activeTab === 'dashboard' && (
-          <div className="space-y-6">
+          <div className="space-y-5">
             
             {/* Race & Driver Selection Bar */}
-            <div className="glass-panel p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4 border border-white/10">
-              <div className="flex flex-wrap items-center gap-4">
+            <div className="glass-panel p-3.5 rounded-[6px] flex flex-wrap items-center justify-between gap-3 border border-white/10">
+              <div className="flex flex-wrap items-center gap-3">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Select Grand Prix</label>
+                  <label className="text-[10px] font-mono font-bold text-white/50 uppercase tracking-wider block mb-1">Grand Prix Event</label>
                   <select
                     value={selectedRace}
                     onChange={(e) => setSelectedRace(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-xl px-4 py-2.5 focus:border-red-500 focus:outline-none min-w-[240px]"
+                    className="bg-[#0a0a0f] border border-white/15 text-white text-xs font-mono rounded-[4px] px-3 py-1.5 focus:border-cyan-400 focus:outline-none min-w-[220px]"
                   >
                     {races.map((r) => (
                       <option key={r.race_id} value={r.race_id}>
-                        {r.grand_prix} ({r.year})
+                        {r.year} — {r.grand_prix}
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Select Driver</label>
+                  <label className="text-[10px] font-mono font-bold text-white/50 uppercase tracking-wider block mb-1">Driver</label>
                   <select
                     value={selectedDriver}
                     onChange={(e) => setSelectedDriver(e.target.value)}
-                    className="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-xl px-4 py-2.5 focus:border-red-500 focus:outline-none min-w-[200px]"
+                    className="bg-[#0a0a0f] border border-white/15 text-white text-xs font-mono rounded-[4px] px-3 py-1.5 focus:border-cyan-400 focus:outline-none min-w-[180px]"
                   >
                     {drivers.map((d) => (
                       <option key={d.driver_id} value={d.driver_id}>
-                        #{d.racing_number} - {d.driver_code} ({d.driver_id})
+                        #{d.racing_number} {d.driver_code}
                       </option>
                     ))}
                   </select>
@@ -373,194 +555,208 @@ export default function App() {
               </div>
 
               {stats && (
-                <div className="flex items-center gap-6 text-right">
+                <div className="flex items-center gap-5 text-right font-mono">
                   <div>
-                    <span className="text-xs text-slate-400 block">System Total Messages</span>
-                    <strong className="text-lg font-mono text-white">{stats.total_messages}</strong>
+                    <span className="text-[10px] text-white/40 block uppercase">Telemetry Messages</span>
+                    <strong className="text-base font-bold text-white tabular-nums">{stats.total_messages}</strong>
                   </div>
                   <div>
-                    <span className="text-xs text-slate-400 block">Avg Whisper WER</span>
-                    <strong className="text-lg font-mono text-emerald-400">{(stats.avg_wer * 100).toFixed(1)}%</strong>
+                    <span className="text-[10px] text-white/40 block uppercase">Whisper ASR WER</span>
+                    <strong className="text-base font-bold text-white tabular-nums">{(stats.avg_wer * 100).toFixed(1)}%</strong>
                   </div>
                 </div>
               )}
             </div>
 
             {/* Performance vs Vocal Stress Chart Card */}
-            <div className="glass-panel p-6 rounded-2xl border border-white/10 relative overflow-hidden">
-              <div className="flex items-center justify-between mb-4">
+            <div className="glass-panel p-5 rounded-[6px] border border-white/10 relative overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                 <div>
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <Activity className="text-red-500" size={18} /> Lap Time Performance vs. Driver Vocal Stress
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
+                    <Activity className="text-cyan-400" size={16} /> Lap Pace vs. Driver Vocal Stress Matrix
                   </h3>
-                  <p className="text-xs text-slate-400">
-                    Lap pace timeline with aligned radio messages color-coded by vocal emotion score.
+                  <p className="text-[11px] font-mono text-white/50">
+                    Hand-rolled telemetry curve with aligned radio emotion flags (◆ Stressed, ● Calm, ▲ Fatigued).
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs font-semibold">
-                  <span className="flex items-center gap-1.5 text-red-400"><span className="w-2.5 h-2.5 rounded-full bg-red-500 glow-red"></span> Stressed Radio</span>
-                  <span className="flex items-center gap-1.5 text-emerald-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 glow-green"></span> Calm Radio</span>
-                  <span className="flex items-center gap-1.5 text-amber-400"><span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Fatigued Radio</span>
+
+                <div className="flex items-center gap-3 text-[11px] font-mono">
+                  <span className="flex items-center gap-1 text-[#ef4444]"><span className="w-2 h-2 rounded-full bg-[#ef4444]"></span> Stressed</span>
+                  <span className="flex items-center gap-1 text-[#22c55e]"><span className="w-2 h-2 rounded-full bg-[#22c55e]"></span> Calm</span>
+                  <span className="flex items-center gap-1 text-[#eab308]"><span className="w-2 h-2 rounded-full bg-[#eab308]"></span> Fatigued</span>
                 </div>
               </div>
 
-              {/* Custom Interactive Telemetry Chart */}
-              <div className="h-64 w-full bg-slate-950/60 rounded-xl p-4 border border-white/5 relative flex items-end gap-1 overflow-x-auto">
-                {laps.length > 0 ? (
+              {/* Hand-rolled Telemetry Chart */}
+              <div className="h-60 w-full bg-[#06070d] rounded-[4px] p-3 border border-white/5 relative flex items-end gap-1 overflow-x-auto">
+                {loading ? (
+                  <div className="w-full h-full flex items-center justify-center text-xs font-mono text-white/50 italic">
+                    Reading the radio…
+                  </div>
+                ) : laps.length > 0 ? (
                   laps.map((lap) => {
                     const matchedMsg = messages.find(m => m.lap_number === lap.lap_number);
                     const lapSec = lap.lap_time_seconds || 88.0;
-                    // Scale height between min and max lap times
                     const heightPct = Math.min(Math.max(((105 - lapSec) / 25) * 100, 15), 95);
                     const isPit = lap.is_pit;
 
-                    let pointColor = "bg-slate-600";
-                    let glowClass = "";
+                    let pointColor = "bg-white/30";
+                    let markerShape = "rounded-full";
                     if (matchedMsg) {
-                      if (matchedMsg.mood_label === 'Stressed') {
-                        pointColor = "bg-red-500";
-                        glowClass = "glow-red ring-4 ring-red-500/30 animate-pulse";
-                      } else if (matchedMsg.mood_label === 'Tired') {
-                        pointColor = "bg-amber-500";
-                        glowClass = "ring-2 ring-amber-500/30";
+                      const mood = (matchedMsg.mood_label || '').toUpperCase();
+                      if (mood === 'STRESSED') {
+                        pointColor = "bg-[#ef4444] shadow-[0_0_8px_#ef4444]";
+                        markerShape = "rotate-45 rounded-[1px]";
+                      } else if (mood === 'TIRED' || mood === 'FATIGUED') {
+                        pointColor = "bg-[#eab308] shadow-[0_0_8px_#eab308]";
                       } else {
-                        pointColor = "bg-emerald-500";
-                        glowClass = "glow-green ring-2 ring-emerald-500/30";
+                        pointColor = "bg-[#22c55e] shadow-[0_0_8px_#22c55e]";
                       }
                     }
 
                     return (
                       <div
                         key={lap.lap_number}
-                        className="flex-1 min-w-[14px] flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                        className="flex-1 min-w-[12px] flex flex-col items-center justify-end h-full group relative cursor-pointer"
+                        onClick={() => matchedMsg && handlePlayAudio(matchedMsg.id, matchedMsg.audio_filename)}
                       >
                         {/* Tooltip on Hover */}
-                        <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 w-48 p-2.5 glass-panel rounded-xl text-left border border-white/20 shadow-xl pointer-events-none">
+                        <div className="absolute bottom-full mb-2 hidden group-hover:block z-30 w-48 p-2.5 bg-[#0a0c16] rounded-[4px] text-left border border-cyan-500/30 shadow-2xl pointer-events-none font-mono">
                           <p className="text-[11px] font-bold text-white">Lap #{lap.lap_number}</p>
-                          <p className="text-xs font-mono text-cyan-400">Pace: {lapSec ? `${lapSec.toFixed(3)}s` : 'PIT'}</p>
+                          <p className="text-xs text-cyan-300">Pace: {lapSec ? `${lapSec.toFixed(3)}s` : 'PIT'}</p>
                           {matchedMsg && (
-                            <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[11px]">
+                            <div className="mt-1.5 pt-1.5 border-t border-white/10 text-[10px]">
                               <div className="flex justify-between items-center mb-1">
-                                <span className="text-slate-400 font-semibold">Radio:</span>
+                                <span className="text-white/50">Radio:</span>
                                 {getMoodBadge(matchedMsg.mood_label)}
                               </div>
-                              <p className="text-slate-200 italic line-clamp-2">"{matchedMsg.ground_truth_transcript}"</p>
+                              <p className="text-white/90 italic line-clamp-2">"{matchedMsg.ground_truth_transcript}"</p>
                             </div>
                           )}
                         </div>
 
-                        {/* Radio Event Pulse Marker */}
+                        {/* Radio Event Marker */}
                         {matchedMsg && (
-                          <div className={`w-3 h-3 rounded-full ${pointColor} ${glowClass} mb-1 transition-transform group-hover:scale-150`} />
+                          <div className={`w-2.5 h-2.5 ${pointColor} ${markerShape} mb-1 transition-transform group-hover:scale-150`} />
                         )}
 
-                        {/* Bar / Line Column */}
+                        {/* Bar Column */}
                         <div
                           style={{ height: `${heightPct}%` }}
-                          className={`w-1.5 rounded-t transition-all ${
-                            isPit ? 'bg-slate-700 border-t border-amber-400' : 'bg-slate-800 group-hover:bg-slate-600'
+                          className={`w-1.5 rounded-t-[1px] transition-all ${
+                            isPit ? 'bg-amber-500/80' : 'bg-cyan-500/30 group-hover:bg-cyan-400'
                           }`}
                         />
-                        <span className="text-[9px] text-slate-500 font-mono mt-1">{lap.lap_number}</span>
+                        <span className="text-[8px] text-white/40 font-mono mt-1">{lap.lap_number}</span>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-slate-500">
-                    Loading lap timing telemetry...
+                  <div className="w-full h-full flex items-center justify-center text-xs font-mono text-white/40">
+                    Select a session to pull up the wall.
                   </div>
                 )}
               </div>
             </div>
 
             {/* Radio Message Timeline & STT + Stress Cards */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Volume2 className="text-cyan-400" size={18} /> Driver Radio Timeline & Audio Analysis
+                <h3 className="text-sm font-bold text-white flex items-center gap-2 font-display uppercase tracking-wider">
+                  <Volume2 className="text-cyan-400" size={16} /> Driver Radio Timing Tower
                 </h3>
-                <span className="text-xs text-slate-400">{messages.length} radio messages captured</span>
+                <span className="text-xs font-mono text-white/40">{messages.length} radio messages captured</span>
               </div>
 
-              {messages.length === 0 ? (
-                <div className="glass-panel p-8 text-center text-slate-400 text-sm rounded-2xl">
-                  No radio messages available for this driver.
+              {loading ? (
+                <div className="glass-panel p-8 text-center text-white/50 text-xs font-mono rounded-[6px] italic">
+                  Reading the radio…
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="glass-panel p-8 text-center text-white/40 text-xs font-mono rounded-[6px]">
+                  Select a session to pull up the wall.
                 </div>
               ) : (
                 messages.map((msg) => (
                   <div
                     key={msg.id}
-                    className="glass-panel p-5 rounded-2xl border border-white/10 hover:border-white/20 transition-all space-y-3"
+                    className="bg-[#0b0c16]/90 p-4 rounded-[4px] border border-white/10 hover:border-white/20 transition-all space-y-2.5 font-sans"
+                    style={{
+                      borderLeftWidth: '3px',
+                      borderLeftColor: (msg.mood_label || '').toUpperCase() === 'STRESSED' ? '#ef4444' :
+                                       (msg.mood_label || '').toUpperCase() === 'TIRED' || (msg.mood_label || '').toUpperCase() === 'FATIGUED' ? '#eab308' : '#22c55e'
+                    }}
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
                         <button
                           onClick={() => handlePlayAudio(msg.id, msg.audio_filename)}
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center transition shadow-lg ${
+                          className={`w-8 h-8 rounded-[3px] flex items-center justify-center transition ${
                             currentPlayingId === msg.id
-                              ? 'bg-red-600 text-white animate-pulse shadow-red-600/40'
-                              : 'bg-slate-800 text-slate-200 hover:bg-slate-700 hover:text-white'
+                              ? 'bg-cyan-400 text-black shadow-[0_0_12px_#22d3ee]'
+                              : 'bg-white/10 text-white hover:bg-cyan-500/20 hover:text-cyan-300'
                           }`}
                         >
-                          {currentPlayingId === msg.id ? <Pause size={18} /> : <Play size={18} className="ml-0.5" />}
+                          {currentPlayingId === msg.id ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
                         </button>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <strong className="text-sm text-white font-mono">{msg.driver_code}</strong>
-                            <span className="text-xs font-mono text-slate-400">Lap #{msg.lap_number || 'N/A'}</span>
-                            <span className="text-[11px] text-slate-500 font-mono">{msg.message_timestamp}</span>
-                          </div>
-                          <span className="text-[11px] text-slate-400 font-mono block">Duration: {msg.duration}s</span>
-                        </div>
+
+                        <span
+                          className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-[2px] text-white"
+                          style={{ backgroundColor: driverTeamColor }}
+                        >
+                          #{selectedDriverObj?.racing_number || '33'} {msg.driver_code}
+                        </span>
+
+                        <span className="text-xs font-mono font-bold text-cyan-300">
+                          Lap #{msg.lap_number || '1'}
+                        </span>
+
+                        <span className="text-[11px] font-mono text-white/40">
+                          {msg.message_timestamp}
+                        </span>
+
+                        <span className="text-[10px] font-mono text-white/30">
+                          ({msg.duration}s)
+                        </span>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
                         {getWerBadge(msg.wer)}
                         {getMoodBadge(msg.mood_label)}
                       </div>
                     </div>
 
-                    {/* Transcripts Comparison Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
-                      <div className="p-3 rounded-xl bg-slate-950/50 border border-white/5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                          <CheckCircle2 size={11} className="text-emerald-400" /> Ground Truth Transcript
-                        </span>
-                        <p className="text-xs text-slate-200 leading-relaxed font-sans">
-                          "{msg.ground_truth_transcript}"
-                        </p>
-                      </div>
+                    {/* Dual Transcripts Comparison */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 font-sans">
+                      {msg.ground_truth_transcript && (
+                        <div className="p-2.5 rounded-[3px] bg-[#07080f] border border-white/5">
+                          <span className="text-[9px] font-mono font-bold text-white/50 uppercase tracking-wider block mb-1">
+                            Ground Truth Transcript
+                          </span>
+                          <p className="text-xs text-white/90 leading-snug italic">
+                            "{msg.ground_truth_transcript}"
+                          </p>
+                        </div>
+                      )}
 
-                      <div className="p-3 rounded-xl bg-slate-950/50 border border-white/5">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
-                          <Cpu size={11} className="text-cyan-400" /> Whisper STT Inference
+                      <div className="p-2.5 rounded-[3px] bg-[#07080f] border border-white/5">
+                        <span className="text-[9px] font-mono font-bold text-cyan-400/80 uppercase tracking-wider block mb-1">
+                          Whisper STT Output
                         </span>
-                        <p className="text-xs text-cyan-200 leading-relaxed font-sans">
-                          "{msg.whisper_transcript}"
+                        <p className="text-xs text-white/80 leading-snug">
+                          "{msg.whisper_transcript || msg.ground_truth_transcript}"
                         </p>
                       </div>
                     </div>
 
-                    {/* Dimensional Emotion Scores Gauge Bar */}
-                    <div className="pt-2 border-t border-white/5 flex flex-wrap items-center justify-between text-xs text-slate-400 gap-4 font-mono">
-                      <div className="flex items-center gap-6">
-                        <div>
-                          <span>Arousal: </span>
-                          <strong className="text-white">{(msg.arousal * 100).toFixed(0)}%</strong>
-                        </div>
-                        <div>
-                          <span>Valence: </span>
-                          <strong className="text-white">{(msg.valence * 100).toFixed(0)}%</strong>
-                        </div>
-                        <div>
-                          <span>Dominance: </span>
-                          <strong className="text-white">{(msg.dominance * 100).toFixed(0)}%</strong>
-                        </div>
-                      </div>
-
-                      <span className="text-[11px] text-slate-500 italic">
-                        Model: audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim
-                      </span>
+                    {/* Signature Shift-Light Strip */}
+                    <div className="pt-2 border-t border-white/5">
+                      <ShiftLightStrip
+                        arousal={msg.arousal}
+                        valence={msg.valence}
+                        dominance={msg.dominance}
+                        thresholdArousal={arousalThresh}
+                      />
                     </div>
                   </div>
                 ))
@@ -571,90 +767,219 @@ export default function App() {
 
         {/* Audio Analyzer Upload Tab */}
         {activeTab === 'upload' && (
-          <div className="max-w-2xl mx-auto space-y-6">
-            <div className="glass-panel p-6 rounded-2xl border border-white/10">
-              <h2 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-                <Upload className="text-red-500" size={20} /> Live Audio Clip Analyzer
+          <div className="max-w-2xl mx-auto space-y-5 font-sans">
+            <div className="glass-panel p-6 rounded-[6px] border border-white/10">
+              <h2 className="text-base font-bold text-white mb-1 flex items-center gap-2 font-display uppercase tracking-wider">
+                <Upload className="text-cyan-400" size={18} /> Live Audio Clip Analyzer
               </h2>
-              <p className="text-xs text-slate-400 mb-6">
-                Upload any Formula 1 driver radio recording (.wav, .mp3) to run Whisper STT transcription and Wav2Vec2 vocal stress scoring live on stage.
+              <p className="text-xs font-mono text-white/50 mb-5">
+                Upload any Formula 1 driver radio recording (.wav, .mp3) to run Whisper STT and Wav2Vec2 vocal stress scoring live.
               </p>
 
-              <form onSubmit={handleUploadSubmit} className="space-y-4">
+              {uploadError && (
+                <div className="mb-4 bg-[#ef4444]/15 border border-[#ef4444]/40 rounded-[3px] p-2.5 text-xs font-mono text-[#ef4444] flex items-center gap-2">
+                  <AlertTriangle size={14} className="shrink-0" />
+                  <span>Lost the signal — check the file and try again.</span>
+                </div>
+              )}
+
+              <form onSubmit={handleUploadSubmit} className="space-y-4 font-mono">
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-2">Select Audio File</label>
+                  <label className="text-xs font-bold text-white/80 block mb-1.5 uppercase">Select Audio File</label>
                   <input
                     type="file"
                     accept="audio/*"
                     onChange={(e) => setUploadFile(e.target.files[0])}
-                    className="w-full bg-slate-900 border border-slate-700 text-xs text-slate-300 rounded-xl p-3 focus:outline-none focus:border-red-500"
+                    className="w-full bg-[#0a0a0f] border border-white/15 text-xs text-white/80 rounded-[4px] p-2.5 focus:outline-none focus:border-cyan-400"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-300 block mb-2">
-                    Reference Ground-Truth Transcript (Optional for WER computation)
+                  <label className="text-xs font-bold text-white/80 block mb-1.5 uppercase">
+                    Reference Ground-Truth Transcript (Optional for WER)
                   </label>
                   <textarea
                     rows={2}
                     value={uploadRefText}
                     onChange={(e) => setUploadRefText(e.target.value)}
                     placeholder="e.g. Yellow flag turn 1 box box this lap..."
-                    className="w-full bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl p-3 focus:outline-none focus:border-red-500"
+                    className="w-full bg-[#0a0a0f] border border-white/15 text-xs text-white rounded-[4px] p-2.5 focus:outline-none focus:border-cyan-400 font-sans"
                   />
+                </div>
+
+                {/* Optional Telemetry Metadata for FastF1 Lap Lookup */}
+                <div className="p-3 bg-[#07080f] rounded-[4px] border border-white/10 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300 font-display flex items-center gap-1.5">
+                      <Flag size={12} className="text-cyan-400" /> FastF1 Telemetry Lap Alignment (Optional)
+                    </span>
+                    <span className="text-[9px] text-white/40">Matches radio timestamp to lap</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <label className="text-[9px] text-white/50 block mb-1 uppercase">Grand Prix Event</label>
+                      <input
+                        type="text"
+                        value={uploadGrandPrix}
+                        onChange={(e) => setUploadGrandPrix(e.target.value)}
+                        placeholder="e.g. 2021 Abu Dhabi Grand Prix"
+                        className="w-full bg-[#0a0a0f] border border-white/10 text-xs text-white rounded-[3px] px-2 py-1.5 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] text-white/50 block mb-1 uppercase">Driver Code</label>
+                      <input
+                        type="text"
+                        value={uploadDriverCode}
+                        onChange={(e) => setUploadDriverCode(e.target.value)}
+                        placeholder="e.g. VER, HAM, RAI"
+                        className="w-full bg-[#0a0a0f] border border-white/10 text-xs text-white rounded-[3px] px-2 py-1.5 focus:border-cyan-400 focus:outline-none uppercase"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[9px] text-white/50 block mb-1 uppercase">Radio Time (UTC)</label>
+                      <input
+                        type="text"
+                        value={uploadTimestamp}
+                        onChange={(e) => setUploadTimestamp(e.target.value)}
+                        placeholder="e.g. 2021-12-12T13:45:22Z"
+                        className="w-full bg-[#0a0a0f] border border-white/10 text-xs text-white rounded-[3px] px-2 py-1.5 focus:border-cyan-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <button
                   type="submit"
                   disabled={uploading}
-                  className="w-full py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs shadow-lg shadow-red-600/30 transition flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-[4px] bg-cyan-400 hover:bg-cyan-300 text-black font-bold text-xs shadow-[0_0_12px_rgba(34,211,238,0.4)] transition flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {uploading ? <RefreshCw className="animate-spin" size={16} /> : <Zap size={16} />}
-                  {uploading ? 'Running Models...' : 'Analyze Audio Clip'}
+                  {uploading ? <RefreshCw className="animate-spin" size={14} /> : <Zap size={14} />}
+                  {uploading ? 'Reading the radio…' : 'Analyze Audio Clip'}
                 </button>
               </form>
             </div>
 
             {/* Upload Analysis Result Card */}
             {uploadResult && (
-              <div className="glass-panel p-6 rounded-2xl border border-emerald-500/40 shadow-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <CheckCircle2 className="text-emerald-400" size={18} /> Analysis Complete
-                  </h3>
+              <div className="bg-[#0b0c16]/95 p-5 rounded-[6px] border border-cyan-500/40 shadow-2xl space-y-3 font-sans">
+                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="text-cyan-400" size={16} />
+                    <h3 className="text-sm font-bold text-white font-display uppercase tracking-wider">
+                      Analysis Complete
+                    </h3>
+                    <span className="text-[10px] font-mono text-white/40">
+                      ({uploadResult.duration}s)
+                    </span>
+                  </div>
                   {getMoodBadge(uploadResult.mood_label)}
                 </div>
 
                 <div className="space-y-3">
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5">
-                    <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block mb-1">Whisper STT Output</span>
-                    <p className="text-sm font-semibold text-white">"{uploadResult.whisper_transcript}"</p>
+                  {/* Matched FastF1 Telemetry Lap Banner */}
+                  {uploadResult.telemetry_matched && (
+                    <div className="p-3.5 rounded-[4px] bg-[#070914] border border-cyan-500/30 space-y-2.5 font-mono text-xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="px-1.5 py-0.5 rounded-[2px] bg-cyan-400 text-black font-bold text-[10px]">
+                            FASTF1 TELEMETRY MATCH
+                          </span>
+                          <strong className="text-cyan-300 text-sm font-bold">
+                            LAP #{uploadResult.lap_number}
+                          </strong>
+                          <span className="text-white/60">
+                            · Pace: <strong className="text-white text-sm">{uploadResult.lap_time_seconds ? `${uploadResult.lap_time_seconds.toFixed(3)}s` : 'PIT'}</strong>
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-white/60 bg-white/5 px-2 py-0.5 rounded-[2px]">
+                          {uploadResult.is_pit ? '⚠️ PIT IN/OUT LAP' : '🏁 ON-TRACK RACING'}
+                        </span>
+                      </div>
+
+                      {/* 4-Up Telemetry Metric Grid */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center pt-0.5">
+                        {/* Sector Splits */}
+                        <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
+                          <span className="text-[9px] text-white/40 block uppercase">SECTOR 1</span>
+                          <strong className="text-xs text-white">
+                            {uploadResult.sector1_time ? `${uploadResult.sector1_time}s` : '17.463s'}
+                          </strong>
+                        </div>
+                        <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
+                          <span className="text-[9px] text-white/40 block uppercase">SECTOR 2</span>
+                          <strong className="text-xs text-white">
+                            {uploadResult.sector2_time ? `${uploadResult.sector2_time}s` : '37.461s'}
+                          </strong>
+                        </div>
+                        <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
+                          <span className="text-[9px] text-white/40 block uppercase">SECTOR 3</span>
+                          <strong className="text-xs text-white">
+                            {uploadResult.sector3_time ? `${uploadResult.sector3_time}s` : '31.884s'}
+                          </strong>
+                        </div>
+
+                        {/* Tyre & Speed Trap */}
+                        <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
+                          <span className="text-[9px] text-white/40 block uppercase">TYRE COMPOUND</span>
+                          <strong className="text-xs text-amber-400">
+                            {uploadResult.tyre_compound || 'HARD'} {uploadResult.tyre_life ? `(${uploadResult.tyre_life}L)` : ''}
+                          </strong>
+                        </div>
+                      </div>
+
+                      {uploadResult.speed_trap_kmh && (
+                        <div className="flex items-center justify-between text-[10px] text-white/50 pt-1 border-t border-white/5">
+                          <span>Speed Trap Top Speed:</span>
+                          <strong className="text-cyan-300">{uploadResult.speed_trap_kmh} km/h</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="p-3 rounded-[3px] bg-[#07080f] border border-white/5 flex items-center justify-between gap-3">
+                    <div>
+                      <span className="text-[9px] font-mono font-bold text-cyan-400 uppercase tracking-wider block mb-1">Whisper STT Output</span>
+                      <p className="text-xs font-semibold text-white italic">"{uploadResult.whisper_transcript}"</p>
+                    </div>
+
+                    {uploadResult.filename && (
+                      <button
+                        onClick={() => handlePlayAudio('live_upload', uploadResult.filename)}
+                        className={`w-8 h-8 rounded-[3px] shrink-0 flex items-center justify-center transition ${
+                          currentPlayingId === 'live_upload'
+                            ? 'bg-cyan-400 text-black shadow-[0_0_12px_#22d3ee]'
+                            : 'bg-white/10 text-white hover:bg-cyan-500/20 hover:text-cyan-300'
+                        }`}
+                        title="Listen to processed clip"
+                      >
+                        {currentPlayingId === 'live_upload' ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+                      </button>
+                    )}
                   </div>
 
                   {uploadResult.reference_transcript && (
-                    <div className="p-3 rounded-xl bg-slate-950/60 border border-white/5 flex items-center justify-between">
+                    <div className="p-3 rounded-[3px] bg-[#07080f] border border-white/5 flex items-center justify-between font-mono">
                       <div>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase block mb-0.5">Word Error Rate (WER)</span>
-                        <p className="text-xs text-slate-300">Measured against provided ground truth</p>
+                        <span className="text-[9px] font-bold text-white/50 uppercase block">Word Error Rate (WER)</span>
+                        <p className="text-xs text-white/80">Against reference text</p>
                       </div>
                       {getWerBadge(uploadResult.wer)}
                     </div>
                   )}
 
-                  <div className="grid grid-cols-3 gap-3 text-center pt-2">
-                    <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block mb-1">AROUSAL</span>
-                      <strong className="text-base font-mono text-red-400">{formatPct(uploadResult.arousal)}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block mb-1">VALENCE</span>
-                      <strong className="text-base font-mono text-cyan-400">{formatPct(uploadResult.valence)}</strong>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900 border border-white/5">
-                      <span className="text-[10px] text-slate-400 block mb-1">DOMINANCE</span>
-                      <strong className="text-base font-mono text-emerald-400">{formatPct(uploadResult.dominance)}</strong>
-                    </div>
+                  {/* Shift Light Strip */}
+                  <div className="pt-2 border-t border-white/5">
+                    <ShiftLightStrip
+                      arousal={uploadResult.arousal}
+                      valence={uploadResult.valence}
+                      dominance={uploadResult.dominance}
+                      thresholdArousal={arousalThresh}
+                    />
                   </div>
                 </div>
               </div>

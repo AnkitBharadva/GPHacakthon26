@@ -16,6 +16,7 @@ from backend.cache_db import (
 from backend.stt_engine import transcribe_audio, compute_wer
 from backend.emotion_engine import analyze_stress_and_emotion, classify_mood
 from backend.process_dataset import populate_demo_data
+from backend.alignment import match_single_timestamp_to_lap
 
 app = FastAPI(
     title="The Silent Co-Driver API",
@@ -32,24 +33,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Ensure static directories exist
-STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
-AUDIO_DIR = os.path.join(STATIC_DIR, "audio")
+# Mount static audio files for frontend player
+AUDIO_DIR = os.path.join(os.path.dirname(__file__), "static", "audio")
 os.makedirs(AUDIO_DIR, exist_ok=True)
-
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 
 @app.on_event("startup")
-def startup_event():
+def on_startup():
     init_db()
-    # Populate initial demo data if database is empty
-    races = get_all_races()
-    if not races:
-        print("[API Startup] Database empty, generating initial demo dataset...")
-        populate_demo_data()
+    populate_demo_data()
+
+class ReclassifyRequest(BaseModel):
+    arousal_thresh: float = 0.60
+    valence_thresh: float = 0.40
+    tired_arousal: float = 0.40
+    tired_valence: float = 0.55
 
 @app.get("/")
-def read_root():
+def root():
     return {
         "status": "online",
         "app": "The Silent Co-Driver",
@@ -61,72 +62,63 @@ def read_root():
     }
 
 @app.get("/api/races")
-def get_races():
-    """List of all available races in dataset."""
+def list_races():
     return get_all_races()
 
 @app.get("/api/races/{race_id}/drivers")
-def get_race_drivers(race_id: str):
-    """List of drivers with radio messages in a specific race."""
-    drivers = get_drivers_for_race(race_id)
-    if not drivers:
-        raise HTTPException(status_code=404, detail=f"No drivers found for race {race_id}")
-    return drivers
+def list_drivers(race_id: str):
+    return get_drivers_for_race(race_id)
 
 @app.get("/api/races/{race_id}/drivers/{driver_id}/messages")
-def get_driver_messages(race_id: str, driver_id: str):
-    """Joined radio message timeline + lap times + vocal mood scoring for a driver."""
-    messages = get_messages_for_driver(race_id, driver_id)
-    return messages
+def list_messages(race_id: str, driver_id: str):
+    return get_messages_for_driver(race_id, driver_id)
 
 @app.get("/api/races/{race_id}/laps/{driver_code}")
-def get_driver_laps(race_id: str, driver_code: str):
-    """FastF1 lap times for lap performance line chart."""
-    laps = get_laps_for_driver(race_id, driver_code.upper())
-    return laps
+def list_laps(race_id: str, driver_code: str):
+    return get_laps_for_driver(race_id, driver_code)
 
-class ThresholdConfig(BaseModel):
-    arousal_thresh: float = 0.6
-    valence_thresh: float = 0.4
-    tired_arousal: float = 0.4
-    tired_valence: float = 0.55
+@app.get("/api/stats")
+def stats():
+    return get_stats()
 
 @app.post("/api/reclassify")
-def reclassify_stress_thresholds(config: ThresholdConfig):
-    """
-    Re-classifies stress and mood labels across cached messages using updated thresholds.
-    Allows real-time tuning by engineers / judges!
-    """
+def reclassify(req: ReclassifyRequest):
     conn = get_db_connection()
-    messages = conn.execute("SELECT id, arousal, valence FROM messages").fetchall()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, arousal, valence FROM messages")
+    messages = cursor.fetchall()
     
     updated_count = 0
     for msg in messages:
-        msg_id, arousal, valence = msg["id"], msg["arousal"], msg["valence"]
         new_mood = classify_mood(
-            arousal, valence, 
-            arousal_thresh=config.arousal_thresh,
-            valence_thresh=config.valence_thresh,
-            tired_arousal=config.tired_arousal,
-            tired_valence=config.tired_valence
+            msg["arousal"], 
+            msg["valence"], 
+            arousal_thresh=req.arousal_thresh,
+            valence_thresh=req.valence_thresh,
+            tired_arousal=req.tired_arousal,
+            tired_valence=req.tired_valence
         )
-        conn.execute("UPDATE messages SET mood_label = ? WHERE id = ?", (new_mood, msg_id))
+        cursor.execute("UPDATE messages SET mood_label = ? WHERE id = ?", (new_mood, msg["id"]))
         updated_count += 1
         
     conn.commit()
     conn.close()
-    return {"status": "success", "updated_messages": updated_count, "config": config}
+    return {"status": "success", "updated_messages": updated_count}
 
 @app.post("/api/audio/upload")
 async def upload_audio_clip(
     file: UploadFile = File(...),
     reference_transcript: Optional[str] = Form(None),
     arousal_thresh: float = Form(0.6),
-    valence_thresh: float = Form(0.4)
+    valence_thresh: float = Form(0.4),
+    grand_prix: Optional[str] = Form(None),
+    year: Optional[int] = Form(None),
+    driver_code: Optional[str] = Form(None),
+    message_timestamp: Optional[str] = Form(None)
 ):
     """
     Accepts user uploaded audio clip (or stage recording),
-    runs Whisper STT + Wav2Vec2 Emotion scoring live!
+    runs Whisper STT + Wav2Vec2 Emotion scoring live, and matches FastF1 telemetry lap if metadata provided!
     """
     temp_filename = f"upload_{file.filename}"
     temp_path = os.path.join(tempfile.gettempdir(), temp_filename)
@@ -165,6 +157,16 @@ async def upload_audio_clip(
             arousal_thresh=arousal_thresh, 
             valence_thresh=valence_thresh
         )
+
+        # Match with FastF1 telemetry lap data if metadata provided
+        lap_info = {"matched": False}
+        if grand_prix and driver_code and message_timestamp:
+            lap_info = match_single_timestamp_to_lap(
+                grand_prix=grand_prix,
+                driver_code=driver_code,
+                timestamp_str=message_timestamp,
+                year=year
+            )
         
         return {
             "filename": save_filename,
@@ -176,7 +178,20 @@ async def upload_audio_clip(
             "arousal": emotion_result["arousal"],
             "dominance": emotion_result["dominance"],
             "valence": emotion_result["valence"],
-            "mood_label": emotion_result["mood_label"]
+            "mood_label": emotion_result["mood_label"],
+            "telemetry_matched": lap_info.get("matched", False),
+            "lap_number": lap_info.get("lap_number"),
+            "lap_time_seconds": lap_info.get("lap_time_seconds"),
+            "sector1_time": lap_info.get("sector1_time"),
+            "sector2_time": lap_info.get("sector2_time"),
+            "sector3_time": lap_info.get("sector3_time"),
+            "tyre_compound": lap_info.get("tyre_compound"),
+            "tyre_life": lap_info.get("tyre_life"),
+            "speed_trap_kmh": lap_info.get("speed_trap_kmh"),
+            "is_pit": lap_info.get("is_pit", False),
+            "driver_code": driver_code,
+            "grand_prix": grand_prix,
+            "message_timestamp": message_timestamp
         }
 
     except Exception as e:
@@ -184,9 +199,7 @@ async def upload_audio_clip(
         raise HTTPException(status_code=500, detail=f"Failed to process audio clip: {str(e)}")
     finally:
         if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-@app.get("/api/stats")
-def get_system_stats():
-    """Summary stats on dataset, STT WER accuracy, and mood distributions."""
-    return get_stats()
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
