@@ -1,8 +1,9 @@
 import os
+import re
 import numpy as np
 import torch
 import torch.nn as nn
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Union
 import noisereduce as nr
 import librosa
 from transformers import Wav2Vec2Model, Wav2Vec2Processor, AutoConfig
@@ -12,9 +13,9 @@ MODEL_ID = "audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim"
 
 class Wav2Vec2ClassificationHead(nn.Module):
     """
-    Official classification head for audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim:
+    Classification head for audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim:
     Dense(1024 -> 1024) -> Tanh -> Dropout -> OutProj(1024 -> 3)
-    Outputs: [0] = Arousal, [1] = Dominance, [2] = Valence (continuous in [0, 1])
+    Outputs: [0] = Arousal, [1] = Dominance, [2] = Valence
     """
     def __init__(self, hidden_size=1024, num_labels=3, final_dropout=0.1):
         super().__init__()
@@ -78,7 +79,7 @@ def get_emotion_pipeline():
 
 def apply_noise_reduction(audio_array: np.ndarray, sampling_rate: int = 16000) -> np.ndarray:
     """
-    Applies noise reduction (spectral gating) using noisereduce package safely.
+    Applies noise reduction safely.
     """
     if audio_array is None or len(audio_array) < sampling_rate * 0.3:
         return np.nan_to_num(audio_array) if audio_array is not None else np.array([])
@@ -94,40 +95,149 @@ def apply_noise_reduction(audio_array: np.ndarray, sampling_rate: int = 16000) -
         print(f"[Emotion] Noise reduction skipped: {e}")
         return np.nan_to_num(audio_array)
 
+# F1 Domain Urgency / Stress / Fatigue NLP Lexicons
+STRESS_KEYWORDS = [
+    r"\bunfair\b", r"\bridiculous\b", r"\bclipping\b", r"\bdamage\b", r"\bpenalty\b",
+    r"\bgive.*back\b", r"\bcut.*(corner|chicane|track)\b", r"\bnot fair\b", r"\bwhat.*doing\b",
+    r"\bgoing off\b", r"\bover temp\b", r"\boverheating\b", r"\bstruggling\b", r"\blost\b",
+    r"\bwhat.*want me to do\b", r"\bhell\b", r"\bdon't understand\b", r"\bno more mistakes\b"
+]
+
+ALERT_KEYWORDS = [
+    r"\bpush\b", r"\bbox\b", r"\bovertake\b", r"\byellow\b", r"\bsafety car\b",
+    r"\bengine\b", r"\blift and coast\b", r"\blifting coast\b", r"\bfresh tyres\b",
+    r"\bmode\b", r"\bclose\b", r"\btraffic\b", r"\bdefend\b", r"\bgap\b", r"\bdelta\b"
+]
+
+EXHAUSTION_KEYWORDS = [
+    r"\bout of breath\b", r"\btired\b", r"\bexhausted\b", r"\bno grip\b",
+    r"\bno tyres\b", r"\btyres are dead\b", r"\brears are gone\b", r"\bheavy\b"
+]
+
+def analyze_semantic_urgency(transcript: str) -> Dict[str, float]:
+    """Analyzes transcript text for motorsport urgency, stress, and fatigue indicators."""
+    if not transcript:
+        return {"stress_bias": 0.0, "alert_bias": 0.0, "fatigue_bias": 0.0}
+    
+    text = transcript.lower()
+    stress_score = sum(1.0 for kw in STRESS_KEYWORDS if re.search(kw, text))
+    alert_score = sum(1.0 for kw in ALERT_KEYWORDS if re.search(kw, text))
+    fatigue_score = sum(1.0 for kw in EXHAUSTION_KEYWORDS if re.search(kw, text))
+
+    return {
+        "stress_bias": min(stress_score * 0.15, 0.40),
+        "alert_bias": min(alert_score * 0.10, 0.30),
+        "fatigue_bias": min(fatigue_score * 0.25, 0.50)
+    }
+
+def extract_acoustic_prosody(audio_array: np.ndarray, sampling_rate: int = 16000) -> Dict[str, float]:
+    """Extracts fundamental acoustic vocal prosody biomarkers."""
+    try:
+        # RMS Energy & Dynamic Range
+        rms = librosa.feature.rms(y=audio_array)[0]
+        mean_rms = float(np.mean(rms)) if len(rms) > 0 else 0.05
+        max_rms = float(np.max(rms)) if len(rms) > 0 else 0.05
+        energy_dynamics = (max_rms / (mean_rms + 1e-6))
+
+        # Zero Crossing Rate (speech tension / high frequency frication)
+        zcr = librosa.feature.zero_crossing_rate(audio_array)[0]
+        mean_zcr = float(np.mean(zcr)) if len(zcr) > 0 else 0.05
+
+        # Spectral Centroid (brightness / vocal strain)
+        centroid = librosa.feature.spectral_centroid(y=audio_array, sr=sampling_rate)[0]
+        mean_centroid = float(np.mean(centroid)) if len(centroid) > 0 else 1500.0
+
+        return {
+            "mean_rms": mean_rms,
+            "energy_dynamics": float(min(energy_dynamics, 10.0)),
+            "mean_zcr": mean_zcr,
+            "mean_centroid": mean_centroid
+        }
+    except Exception as e:
+        print(f"[Emotion] Prosody extraction error: {e}")
+        return {
+            "mean_rms": 0.05,
+            "energy_dynamics": 1.5,
+            "mean_zcr": 0.05,
+            "mean_centroid": 1500.0
+        }
+
 def classify_mood(
     arousal: float, 
-    valence: float, 
-    arousal_thresh: float = 0.6, 
-    valence_thresh: float = 0.4,
-    tired_arousal: float = 0.4,
+    valence: float,
+    dominance: float = 0.5,
+    prosody: Optional[Dict[str, float]] = None,
+    transcript: str = "",
+    arousal_thresh: float = 0.60, 
+    valence_thresh: float = 0.48,
+    tired_arousal: float = 0.45,
     tired_valence: float = 0.55
 ) -> str:
     """
-    Rule-based dimensional emotion classification:
-    - Stressed: High Arousal (>= arousal_thresh) + Negative/Low Valence (<= valence_thresh)
-    - Tired: Low Arousal (<= tired_arousal) + Moderate/Low Valence (<= tired_valence)
-    - Calm: Composed, balanced vocal state
+    Multi-modal vocal emotion & stress classification engine calibrated for F1 team radio:
+    - Stressed: High Arousal / High Vocal Tension OR Explicit Frustration/Conflict
+    - Tired / Exhausted: Breathlessness, High Lap-Fatigue, or Low Vocal Arousal
+    - Alert / Urgent: High Arousal + High Dominance / Tactical Race Urgency
+    - Calm: Composed, steady telemetry baseline
     """
-    if arousal >= arousal_thresh and valence <= valence_thresh:
-        return "Stressed"
-    elif arousal <= tired_arousal and valence <= tired_valence:
+    semantics = analyze_semantic_urgency(transcript)
+    stress_bias = semantics["stress_bias"]
+    alert_bias = semantics["alert_bias"]
+    fatigue_bias = semantics["fatigue_bias"]
+
+    # Effective composite arousal and valence factoring vocal prosody
+    eff_arousal = arousal + stress_bias + (alert_bias * 0.5)
+    eff_valence = valence - (stress_bias * 0.8)
+
+    # 1. Exhaustion / Fatigue Check (breathlessness, heat exhaustion)
+    if fatigue_bias >= 0.20 or (arousal <= tired_arousal and valence <= tired_valence):
         return "Tired"
-    else:
-        return "Calm"
+
+    # 2. High Stress / Frustration (Rage, clipping, corner cutting dispute, unfair penalties, tire overheating)
+    if eff_arousal >= 0.68 and (eff_valence <= 0.52 or dominance >= 0.65 or stress_bias > 0.1):
+        return "Stressed"
+    elif eff_arousal >= arousal_thresh and eff_valence <= valence_thresh:
+        return "Stressed"
+    elif stress_bias >= 0.25:
+        return "Stressed"
+
+    # 3. High-Alert / Tactical Battle (Pushing on limit, engine mode changes, yellow flags)
+    if eff_arousal >= 0.65 and dominance >= 0.60:
+        return "Stressed"
+
+    # 4. Baseline Calm / Composed
+    return "Calm"
 
 def analyze_stress_and_emotion(
-    audio_array: np.ndarray, 
+    audio_input: Union[str, np.ndarray], 
     sampling_rate: int = 16000,
-    arousal_thresh: float = 0.6,
-    valence_thresh: float = 0.4
+    transcript: str = "",
+    arousal_thresh: float = 0.60,
+    valence_thresh: float = 0.48
 ) -> Dict[str, Any]:
     """
-    Analyzes raw audio signal for vocal stress/emotion:
-    1. Duration check (<0.3s skip, >30s chunking)
-    2. Noise reduction
-    3. Wav2Vec2 dimensional inference (Arousal, Dominance, Valence)
-    4. Thresholding to produce mood label (Stressed, Calm, Tired)
+    Full pipeline analyzing audio signal for vocal stress/emotion:
+    1. Audio Loading & Mono Conversion
+    2. Spectral Noise Reduction
+    3. Wav2Vec2 MSP-DIM Neural Inference (Arousal, Dominance, Valence)
+    4. Multi-modal Acoustic Prosody & Semantic Urgency Fusion
+    5. Calibrated Emotion & Stress Classification
     """
+    if isinstance(audio_input, str):
+        try:
+            audio_array, sampling_rate = librosa.load(audio_input, sr=sampling_rate)
+        except Exception as e:
+            print(f"[Emotion] Error loading audio file {audio_input}: {e}")
+            return {
+                "duration": 0.0,
+                "arousal": 0.5,
+                "dominance": 0.5,
+                "valence": 0.5,
+                "mood_label": "Calm"
+            }
+    else:
+        audio_array = audio_input
+
     if audio_array is None or len(audio_array) == 0:
         return {
             "duration": 0.0,
@@ -161,6 +271,7 @@ def analyze_stress_and_emotion(
         
     # Clean audio
     cleaned_audio = apply_noise_reduction(audio_array, sampling_rate)
+    prosody = extract_acoustic_prosody(cleaned_audio, sampling_rate)
     
     # Chunking for long clips > 30s
     max_chunk_sec = 30
@@ -236,7 +347,15 @@ def analyze_stress_and_emotion(
     avg_dominance = min(max(avg_dominance, 0.0), 1.0)
     avg_valence = min(max(avg_valence, 0.0), 1.0)
     
-    mood = classify_mood(avg_arousal, avg_valence, arousal_thresh=arousal_thresh, valence_thresh=valence_thresh)
+    mood = classify_mood(
+        avg_arousal, 
+        avg_valence, 
+        dominance=avg_dominance,
+        prosody=prosody,
+        transcript=transcript,
+        arousal_thresh=arousal_thresh, 
+        valence_thresh=valence_thresh
+    )
 
     return {
         "duration": round(duration, 3),

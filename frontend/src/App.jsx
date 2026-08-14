@@ -260,7 +260,8 @@ export default function App() {
 
   // Play audio
   const handlePlayAudio = (msgId, filename) => {
-    const audioUrl = `${API_BASE}/static/audio/${filename}`;
+    // Add cache buster query parameter so browsers never play stale cached beep tones
+    const audioUrl = `${API_BASE}/static/audio/${filename}?t=${Date.now()}`;
     if (currentPlayingId === msgId) {
       audioRef.current?.pause();
       setCurrentPlayingId(null);
@@ -354,7 +355,7 @@ export default function App() {
     } else if (m === 'TIRED' || m === 'FATIGUED') {
       return (
         <span className="px-2 py-0.5 rounded-[3px] text-[10px] font-bold font-mono tracking-wider bg-[#eab308]/15 text-[#eab308] border border-[#eab308]/40 flex items-center gap-1">
-          <Clock size={11} /> FATIGUED
+          <Clock size={11} /> TIRED
         </span>
       );
     } else {

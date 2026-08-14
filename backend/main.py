@@ -85,14 +85,17 @@ def stats():
 def reclassify(req: ReclassifyRequest):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, arousal, valence FROM messages")
+    cursor.execute("SELECT id, arousal, valence, dominance, ground_truth_transcript, whisper_transcript FROM messages")
     messages = cursor.fetchall()
     
     updated_count = 0
     for msg in messages:
+        txt = msg["whisper_transcript"] or msg["ground_truth_transcript"] or ""
         new_mood = classify_mood(
             msg["arousal"], 
-            msg["valence"], 
+            msg["valence"],
+            dominance=msg["dominance"] if "dominance" in msg.keys() else 0.5,
+            transcript=txt,
             arousal_thresh=req.arousal_thresh,
             valence_thresh=req.valence_thresh,
             tired_arousal=req.tired_arousal,
@@ -153,7 +156,8 @@ async def upload_audio_clip(
         wer_val = compute_wer(reference_transcript, whisper_transcript) if reference_transcript else 0.0
         
         emotion_result = analyze_stress_and_emotion(
-            audio_data, sr, 
+            audio_data, sr,
+            transcript=whisper_transcript,
             arousal_thresh=arousal_thresh, 
             valence_thresh=valence_thresh
         )

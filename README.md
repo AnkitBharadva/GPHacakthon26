@@ -238,25 +238,32 @@ Raw Audio ──→ Zero-Variance Guard (σ > 10⁻⁵) ──→ Spectral Gatin
 
 ---
 
-### D. Rule-Based Stress Classification
+### D. Multi-Modal Stress Classification Engine
 
-The continuous dimensional outputs are mapped to discrete driver states via **engineer-adjustable thresholds**:
+The continuous dimensional outputs are combined with **acoustic vocal prosody** and **motorsport semantic urgency** via multi-modal fusion:
 
 ```
 Driver State =
-  🔴 STRESSED   →  if  Arousal > T_arousal   AND  Valence < T_valence
-  🟡 FATIGUED   →  if  Arousal < T_tired_a   AND  Valence < T_tired_v
-  🟢 CALM       →  otherwise
+  🔴 STRESSED   →  if  (A_eff ≥ 0.68 AND (V_eff ≤ 0.52 OR D ≥ 0.65 OR β_stress > 0.1))
+                   OR  (A_eff ≥ T_arousal AND V_eff ≤ T_valence)
+                   OR  (A_eff ≥ 0.65 AND D ≥ 0.60)
+  🟣 TIRED      →  if  β_fatigue ≥ 0.20  OR  (A ≤ T_tired_a AND V ≤ T_tired_v)
+  🟢 CALM       →  otherwise (balanced physiological baseline)
 ```
 
-**Default Threshold Configuration:**
+**Fusion Inputs:**
+* **Vocal Prosody:** RMS dynamic range bursts, Zero-Crossing Rate ($ZCR$) tension, and Spectral Centroid frequency shifts.
+* **Semantic Urgency Biases:** NLP scoring of key racing distress terms (*"unfair"*, *"clipping"*, *"over temp"*, *"cut the chicane"*, *"out of breath"*).
+* **Calibrated Dimensional Coordinates:** $A_{eff} = A + \beta_{stress} + 0.5\beta_{alert}$, $V_{eff} = V - 0.8\beta_{stress}$.
+
+**Default Calibrated Configuration:**
 
 | Threshold | Symbol | Default | Adjustable |
 | :--- | :---: | :---: | :---: |
-| Arousal (Stress) | `T_arousal` | `0.60` | ✅ Via UI slider |
-| Valence (Stress) | `T_valence` | `0.40` | ✅ Via UI slider |
-| Arousal (Fatigue) | `T_tired_a` | `0.40` | Hardcoded |
-| Valence (Fatigue) | `T_tired_v` | `0.55` | Hardcoded |
+| Arousal (Stress Activation) | `T_arousal` | `0.60` | ✅ Via UI slider |
+| Valence (Negativity Floor) | `T_valence` | `0.48` | ✅ Via UI slider |
+| Arousal (Fatigue Floor) | `T_tired_a` | `0.45` | Hardcoded |
+| Valence (Fatigue Ceiling) | `T_tired_v` | `0.55` | Hardcoded |
 
 > **Dynamic Calibration:** Race engineers can modify stress thresholds in real-time via the **Threshold Tuner** drawer panel. Changes trigger a `POST /api/reclassify` that re-scores all cached messages against the new boundaries — no re-inference required.
 
@@ -437,7 +444,7 @@ CREATE TABLE messages (
     arousal                   REAL,                -- Wav2Vec2 arousal ∈ [0, 1]
     dominance                 REAL,                -- Wav2Vec2 dominance ∈ [0, 1]
     valence                   REAL,                -- Wav2Vec2 valence ∈ [0, 1]
-    mood_label                TEXT,                -- "STRESSED" | "CALM" | "FATIGUED"
+    mood_label                TEXT,                -- "STRESSED" | "CALM" | "TIRED"
     lap_number                INTEGER,             -- Aligned via FastF1
     lap_time_seconds          REAL,                -- Aligned lap pace
     duration                  REAL,                -- Audio clip length (seconds)
@@ -501,60 +508,66 @@ curl -X POST http://127.0.0.1:8000/api/audio/upload \
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Quickstart & Collaborator Setup
 
-### Prerequisites
+### 📦 Where Does the Data Come From?
 
-| Requirement | Minimum Version |
-| :--- | :--- |
-| Anaconda / Miniconda | Latest |
-| Node.js | v18+ |
-| npm | v9+ |
-| Git | Latest |
+The platform orchestrates **3 automated data streams** (100% free, public, and reproducible):
 
-### Step 1 — Clone & Enter
+| Data Stream | Source | How It’s Handled |
+| :--- | :--- | :--- |
+| **🎙️ F1 Team Radio Audio** | Hugging Face: [`MikCil/f1-team-radio`](https://huggingface.co/datasets/MikCil/f1-team-radio) | Downloaded & extracted automatically via `python extractor.py` |
+| **🏎️ F1 Lap Telemetry & Laps** | Official F1 Timing via [`FastF1`](https://github.com/theOehrly/Fast-F1) | Downloaded live on-the-fly for any GP event (`fastf1.get_session`) |
+| **🧠 Neural AI Models** | Hugging Face Hub (`whisper-base` & `wav2vec2-large-robust-12-ft-emotion-msp-dim`) | Auto-cached in `~/.cache/huggingface/` on first inference run |
+
+---
+
+### Step-by-Step Installation
+
+#### Step 1 — Clone Repository & Set Up Environment
 
 ```bash
+# 1. Clone repository
 git clone https://github.com/AnkitBharadva/GPHacakthon26.git
 cd GPHacakthon26
-```
 
-### Step 2 — Backend Setup (Conda Environment)
-
-```bash
-# Create the environment (first time only)
+# 2. Create Python 3.10 environment
 conda create -n gp python=3.10 -y
 conda activate gp
 
-# Install dependencies
-pip install fastapi uvicorn torch torchaudio transformers datasets jiwer noisereduce soundfile numpy fastf1
+# 3. Install dependencies
+pip install -r backend/requirements.txt
 ```
 
-### Step 3 — Start the Backend
+#### Step 2 — Data Setup (Choose One Option)
+
+* **Option A (Instant Start — Pre-bundled Database):**  
+  The repository already comes pre-loaded with [`backend/silent_codriver.db`](file:///D:/GP/backend/silent_codriver.db) and static audio files. You can immediately launch the servers!
+* **Option B (Download Full Hugging Face Dataset — 14,680 Clips):**  
+  ```bash
+  python extractor.py
+  ```
+* **Option C (Regenerate All Telemetry & Audio Mappings from Scratch):**  
+  ```bash
+  python -m backend.process_dataset
+  ```
+
+#### Step 3 — Launch the Backend (FastAPI on Port 8000)
 
 ```bash
-conda run -n gp python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+conda activate gp
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+> 🟢 Backend API live at: **http://127.0.0.1:8000**
 
-> 🟢 Backend live at: **http://127.0.0.1:8000**
-
-### Step 4 — Frontend Setup & Launch
+#### Step 4 — Launch the Frontend Dashboard (React + Vite on Port 3000)
 
 ```bash
 cd frontend
 npm install
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
-
-> 🟢 Dashboard live at: **http://127.0.0.1:3000**
-
-### Step 5 — (Optional) Batch Process Dataset
-
-To populate the database with F1 radio data from HuggingFace:
-
-```bash
-conda run -n gp python -c "from backend.process_dataset import process_dataset; process_dataset(max_samples=50)"
-```
+> 🟢 Pit-Wall Dashboard live at: **http://127.0.0.1:3000**
 
 ---
 
@@ -570,7 +583,7 @@ The dashboard implements a **glassmorphic dark theme** inspired by professional 
 | `--bg-card` | `rgba(18, 18, 30, 0.8)` | Glass card background |
 | `--accent-red` | `#ef4444` | STRESSED indicators |
 | `--accent-green` | `#22c55e` | CALM indicators |
-| `--accent-yellow` | `#eab308` | FATIGUED indicators |
+| `--accent-yellow` | `#eab308` | TIRED indicators |
 | `--radius` | `12px` | Card border radius |
 | `backdrop-filter` | `blur(12px)` | Glassmorphism effect |
 
@@ -603,7 +616,7 @@ Upload .wav/.mp3 ──→ Temp file save ──→ ┬── Whisper STT ──
                                                     Threshold Classification
                                                               │
                                                               ▼
-                                                 🔴 STRESSED / 🟢 CALM / 🟡 FATIGUED
+                                                  🔴 STRESSED / 🟢 CALM / 🟡 TIRED
 ```
 
 The temp file is **automatically cleaned up** after inference completes.

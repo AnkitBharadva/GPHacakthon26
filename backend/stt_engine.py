@@ -1,6 +1,9 @@
 import re
+import os
 import numpy as np
-from typing import Dict, Any, Tuple, Optional
+import soundfile as sf
+import librosa
+from typing import Dict, Any, Tuple, Optional, Union
 import jiwer
 
 _whisper_pipeline = None
@@ -45,23 +48,32 @@ def compute_wer(ground_truth: str, hypothesis: str) -> float:
         print(f"[STT] WER calculation error: {e}")
         return 0.0
 
-def transcribe_audio(audio_array: np.ndarray, sampling_rate: int = 16000) -> str:
+def transcribe_audio(audio_input: Union[str, np.ndarray], sampling_rate: int = 16000) -> str:
     """
-    Transcribes audio array using Whisper.
+    Transcribes audio array or audio file path using Whisper.
     """
     pipe = get_whisper_pipeline()
     if pipe is None:
         return "[Whisper pipeline offline]"
     
     try:
-        # Clean NaNs and ensure float32 array
+        if isinstance(audio_input, str):
+            # Load audio file using librosa at 16kHz
+            audio_array, sr = librosa.load(audio_input, sr=sampling_rate)
+        else:
+            audio_array = audio_input
+            
         audio_inputs = np.nan_to_num(audio_array).astype(np.float32)
         if len(audio_inputs) == 0:
             return "[No audio data]"
-        result = pipe({"raw": audio_inputs, "sampling_rate": sampling_rate}, generate_kwargs={"language": "english"})
+            
+        result = pipe(
+            {"raw": audio_inputs, "sampling_rate": sampling_rate},
+            generate_kwargs={"language": "english"},
+            return_timestamps=True
+        )
         text = result.get("text", "").strip()
         return text if text else "[Audio processed - low/no clear speech detected]"
     except Exception as e:
         print(f"[STT] Transcription failed: {e}")
         return f"[Transcription error: {e}]"
-
