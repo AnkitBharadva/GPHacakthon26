@@ -158,15 +158,15 @@ async def upload_audio_clip(
             valence_thresh=valence_thresh
         )
 
-        # Match with FastF1 telemetry lap data if metadata provided
-        lap_info = {"matched": False}
-        if grand_prix and driver_code and message_timestamp:
-            lap_info = match_single_timestamp_to_lap(
-                grand_prix=grand_prix,
-                driver_code=driver_code,
-                timestamp_str=message_timestamp,
-                year=year
-            )
+        # Match with FastF1 telemetry lap data (from user form or auto-detected from audio)
+        lap_info = match_single_timestamp_to_lap(
+            grand_prix=grand_prix,
+            driver_code=driver_code,
+            timestamp_str=message_timestamp,
+            year=year,
+            filename=file.filename,
+            whisper_transcript=whisper_transcript
+        )
         
         return {
             "filename": save_filename,
@@ -189,9 +189,9 @@ async def upload_audio_clip(
             "tyre_life": lap_info.get("tyre_life"),
             "speed_trap_kmh": lap_info.get("speed_trap_kmh"),
             "is_pit": lap_info.get("is_pit", False),
-            "driver_code": driver_code,
-            "grand_prix": grand_prix,
-            "message_timestamp": message_timestamp
+            "driver_code": lap_info.get("driver_code") or driver_code,
+            "grand_prix": lap_info.get("grand_prix") or grand_prix,
+            "message_timestamp": lap_info.get("message_timestamp") or message_timestamp
         }
 
     except Exception as e:

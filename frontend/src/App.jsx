@@ -5,6 +5,12 @@ import {
   Sliders, Database, Cpu, ChevronRight, Check, X
 } from 'lucide-react';
 
+import ExperienceLayer, { ParcFermeToggle } from './experience-layer/ExperienceLayer';
+import ThermalStateLayer from './experience-layer/ThermalStateLayer';
+import RevCounterLoader from './experience-layer/RevCounterLoader';
+import { triggerTyreSmokeBurst } from './experience-layer/TyreSmokeBurst';
+import { raceState } from './experience-layer/raceStateStore';
+
 const API_BASE = "http://localhost:8000";
 
 // F1 Team Colors for Driver Badges
@@ -168,9 +174,9 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' | 'upload'
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadRefText, setUploadRefText] = useState('');
-  const [uploadGrandPrix, setUploadGrandPrix] = useState('2021 Abu Dhabi Grand Prix');
-  const [uploadDriverCode, setUploadDriverCode] = useState('VER');
-  const [uploadTimestamp, setUploadTimestamp] = useState('2021-12-12T13:45:22Z');
+  const [uploadGrandPrix, setUploadGrandPrix] = useState('');
+  const [uploadDriverCode, setUploadDriverCode] = useState('');
+  const [uploadTimestamp, setUploadTimestamp] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState(false);
@@ -324,6 +330,10 @@ export default function App() {
       if (!res.ok) throw new Error("Upload failed");
       const data = await res.json();
       setUploadResult(data);
+      if ((data.mood_label || '').toUpperCase() === 'STRESSED') {
+        triggerTyreSmokeBurst(window.innerWidth / 2, window.innerHeight * 0.45);
+        raceState.recordStressEvent();
+      }
     } catch (err) {
       console.error("Upload error:", err);
       setUploadError(true);
@@ -383,70 +393,75 @@ export default function App() {
   const driverTeamColor = DRIVER_COLORS[driverCode] || '#22d3ee';
 
   return (
-    <div className="min-h-screen pb-16 font-sans">
-      {/* Top Header Navigation */}
-      <header className="glass-panel sticky top-0 z-40 border-b border-white/10 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 rounded-[4px] shadow-[0_0_12px_rgba(34,211,238,0.25)] flex items-center justify-center">
-            <Zap className="fill-current" size={20} />
-          </div>
-          <div>
-            <h1 className="text-base md:text-lg font-bold tracking-wider text-white flex items-center gap-2 font-display">
-              THE SILENT CO-DRIVER <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded-[2px] border border-cyan-500/30 font-mono">PIT-WALL</span>
-            </h1>
-            <p className="text-[11px] font-mono text-white/50">
-              Vocal Stress Intelligence • Whisper STT • Lap Telemetry Alignment
-            </p>
-          </div>
-        </div>
+    <ThermalStateLayer>
+      <ExperienceLayer />
 
-        {/* Model & Dataset Technical Badges */}
-        <div className="hidden xl:flex items-center gap-2 text-xs font-mono">
-          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
-            <Database size={12} className="text-cyan-400" />
-            <span>Dataset: <strong className="text-white">MikCil/f1-team-radio</strong></span>
+      <div className="min-h-screen pb-16 font-sans">
+        {/* Top Header Navigation */}
+        <header className="glass-panel sticky top-0 z-40 border-b border-white/10 px-4 md:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 rounded-[4px] shadow-[0_0_12px_rgba(34,211,238,0.25)] flex items-center justify-center">
+              <Zap className="fill-current" size={20} />
+            </div>
+            <div>
+              <h1 className="text-base md:text-lg font-bold tracking-wider text-white flex items-center gap-2 font-display">
+                THE SILENT CO-DRIVER <span className="text-[10px] bg-cyan-500/20 text-cyan-300 px-1.5 py-0.2 rounded-[2px] border border-cyan-500/30 font-mono">PIT-WALL</span>
+              </h1>
+              <p className="text-[11px] font-mono text-white/50">
+                Vocal Stress Intelligence • Whisper STT • Lap Telemetry Alignment
+              </p>
+            </div>
           </div>
-          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
-            <Cpu size={12} className="text-cyan-400" />
-            <span>ASR: <strong className="text-white">whisper-base</strong></span>
-          </div>
-          <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
-            <Activity size={12} className="text-cyan-400" />
-            <span>Emotion: <strong className="text-white">wav2vec2-msp-dim</strong></span>
-          </div>
-        </div>
 
-        {/* Navigation Tabs & Threshold Trigger */}
-        <div className="flex items-center gap-2 font-mono text-xs">
-          <button
-            onClick={() => setActiveTab('dashboard')}
-            className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
-              activeTab === 'dashboard'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
-                : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
-            }`}
-          >
-            <BarChart3 size={13} /> PIT-WALL TELEMETRY
-          </button>
-          <button
-            onClick={() => setActiveTab('upload')}
-            className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
-              activeTab === 'upload'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
-                : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
-            }`}
-          >
-            <Upload size={13} /> LIVE ANALYZER
-          </button>
-          <button
-            onClick={() => setTuningOpen(true)}
-            className="p-1.5 rounded-[4px] bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition border border-white/10"
-            title="Engineer Stress Threshold Calibration"
-          >
-            <Sliders size={16} />
-          </button>
-        </div>
-      </header>
+          {/* Model & Dataset Technical Badges */}
+          <div className="hidden xl:flex items-center gap-2 text-xs font-mono">
+            <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+              <Database size={12} className="text-cyan-400" />
+              <span>Dataset: <strong className="text-white">MikCil/f1-team-radio</strong></span>
+            </div>
+            <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+              <Cpu size={12} className="text-cyan-400" />
+              <span>ASR: <strong className="text-white">whisper-base</strong></span>
+            </div>
+            <div className="px-2.5 py-1 rounded-[3px] bg-white/5 border border-white/10 text-white/70 flex items-center gap-1.5">
+              <Activity size={12} className="text-cyan-400" />
+              <span>Emotion: <strong className="text-white">wav2vec2-msp-dim</strong></span>
+            </div>
+          </div>
+
+          {/* Navigation Tabs, Parc Fermé FX Toggle & Threshold Trigger */}
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <ParcFermeToggle />
+
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
+                activeTab === 'dashboard'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                  : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
+              }`}
+            >
+              <BarChart3 size={13} /> PIT-WALL TELEMETRY
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`px-3 py-1.5 rounded-[4px] font-bold transition flex items-center gap-1.5 ${
+                activeTab === 'upload'
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-[0_0_10px_rgba(34,211,238,0.3)]'
+                  : 'bg-white/5 text-white/60 hover:text-white border border-transparent'
+              }`}
+            >
+              <Upload size={13} /> LIVE ANALYZER
+            </button>
+            <button
+              onClick={() => setTuningOpen(true)}
+              className="p-1.5 rounded-[4px] bg-white/5 text-white/70 hover:text-white hover:bg-white/10 transition border border-white/10"
+              title="Engineer Stress Threshold Calibration"
+            >
+              <Sliders size={16} />
+            </button>
+          </div>
+        </header>
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 pt-5 space-y-5">
@@ -669,8 +684,8 @@ export default function App() {
               </div>
 
               {loading ? (
-                <div className="glass-panel p-8 text-center text-white/50 text-xs font-mono rounded-[6px] italic">
-                  Reading the radio…
+                <div className="glass-panel p-6 rounded-[6px]">
+                  <RevCounterLoader label="READING RADIO FREQUENCIES…" />
                 </div>
               ) : messages.length === 0 ? (
                 <div className="glass-panel p-8 text-center text-white/40 text-xs font-mono rounded-[6px]">
@@ -882,7 +897,7 @@ export default function App() {
 
                 <div className="space-y-3">
                   {/* Matched FastF1 Telemetry Lap Banner */}
-                  {uploadResult.telemetry_matched && (
+                  {uploadResult.telemetry_matched ? (
                     <div className="p-3.5 rounded-[4px] bg-[#070914] border border-cyan-500/30 space-y-2.5 font-mono text-xs">
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2">
                         <div className="flex items-center gap-2">
@@ -895,6 +910,11 @@ export default function App() {
                           <span className="text-white/60">
                             · Pace: <strong className="text-white text-sm">{uploadResult.lap_time_seconds ? `${uploadResult.lap_time_seconds.toFixed(3)}s` : 'PIT'}</strong>
                           </span>
+                          {uploadResult.driver_code && (
+                            <span className="text-white/40 text-[11px]">
+                              ({uploadResult.driver_code} · {uploadResult.grand_prix})
+                            </span>
+                          )}
                         </div>
                         <span className="text-[10px] text-white/60 bg-white/5 px-2 py-0.5 rounded-[2px]">
                           {uploadResult.is_pit ? '⚠️ PIT IN/OUT LAP' : '🏁 ON-TRACK RACING'}
@@ -907,19 +927,19 @@ export default function App() {
                         <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
                           <span className="text-[9px] text-white/40 block uppercase">SECTOR 1</span>
                           <strong className="text-xs text-white">
-                            {uploadResult.sector1_time ? `${uploadResult.sector1_time}s` : '17.463s'}
+                            {uploadResult.sector1_time ? `${uploadResult.sector1_time}s` : 'N/A'}
                           </strong>
                         </div>
                         <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
                           <span className="text-[9px] text-white/40 block uppercase">SECTOR 2</span>
                           <strong className="text-xs text-white">
-                            {uploadResult.sector2_time ? `${uploadResult.sector2_time}s` : '37.461s'}
+                            {uploadResult.sector2_time ? `${uploadResult.sector2_time}s` : 'N/A'}
                           </strong>
                         </div>
                         <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
                           <span className="text-[9px] text-white/40 block uppercase">SECTOR 3</span>
                           <strong className="text-xs text-white">
-                            {uploadResult.sector3_time ? `${uploadResult.sector3_time}s` : '31.884s'}
+                            {uploadResult.sector3_time ? `${uploadResult.sector3_time}s` : 'N/A'}
                           </strong>
                         </div>
 
@@ -927,7 +947,7 @@ export default function App() {
                         <div className="bg-white/5 p-2 rounded-[2px] border border-white/5">
                           <span className="text-[9px] text-white/40 block uppercase">TYRE COMPOUND</span>
                           <strong className="text-xs text-amber-400">
-                            {uploadResult.tyre_compound || 'HARD'} {uploadResult.tyre_life ? `(${uploadResult.tyre_life}L)` : ''}
+                            {uploadResult.tyre_compound || 'UNKNOWN'} {uploadResult.tyre_life ? `(${uploadResult.tyre_life}L)` : ''}
                           </strong>
                         </div>
                       </div>
@@ -938,6 +958,11 @@ export default function App() {
                           <strong className="text-cyan-300">{uploadResult.speed_trap_kmh} km/h</strong>
                         </div>
                       )}
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-[3px] bg-white/[0.03] border border-white/10 flex items-center justify-between text-[11px] font-mono text-white/50">
+                      <span>⚡ Standalone Vocal Acoustic Analysis</span>
+                      <span className="text-[10px] text-white/40 italic">Provide Grand Prix / Driver / Time to sync FastF1 lap curve</span>
                     </div>
                   )}
 
@@ -987,7 +1012,8 @@ export default function App() {
           </div>
         )}
 
-      </main>
-    </div>
+        </main>
+      </div>
+    </ThermalStateLayer>
   );
 }
