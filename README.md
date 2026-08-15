@@ -571,33 +571,53 @@ npm run dev -- --host 127.0.0.1 --port 3000
 
 ---
 
-## 🖥 Frontend Dashboard
+---
+
+## 🖥 Frontend Dashboard & Visual Experience Layer
 
 The dashboard implements a **glassmorphic dark theme** inspired by professional F1 telemetry interfaces, built entirely with vanilla CSS and custom SVG — **zero charting libraries**.
 
-### Design System
+### Design System Tokens
 
 | Token | Value | Usage |
 | :--- | :--- | :--- |
-| `--bg-primary` | `#0a0a0f` | Page background |
-| `--bg-card` | `rgba(18, 18, 30, 0.8)` | Glass card background |
-| `--accent-red` | `#ef4444` | STRESSED indicators |
-| `--accent-green` | `#22c55e` | CALM indicators |
-| `--accent-yellow` | `#eab308` | TIRED indicators |
-| `--radius` | `12px` | Card border radius |
-| `backdrop-filter` | `blur(12px)` | Glassmorphism effect |
+| `--bg-primary` | `#0a0a0f` | Deep carbon page background |
+| `--bg-card` | `rgba(18, 18, 30, 0.8)` | Glassmorphic HUD surface |
+| `--accent-red` | `#ef4444` | STRESSED indicators & Redline warnings |
+| `--accent-green` | `#22c55e` | CALM baseline & Sector 1 markers |
+| `--accent-yellow` | `#eab308` | TIRED indicators & Sector 2 markers |
+| `--accent-cyan` | `#00D2BE` | Active HUD telemetry & interactive controls |
+| `--accent-purple` | `#a855f7` | Sector 3 & peak RPM indicators |
+| `backdrop-filter` | `blur(12px)` | Ambient frosted glass effect |
 
-### Tab Views
+### Tab Views & Navigation
 
-| Tab | Features |
+| Tab View | Interactive Capabilities |
 | :--- | :--- |
-| **📈 Telemetry** | Race/Driver selectors → Custom SVG pace chart with mood-colored radio markers → Stats cards (stress count, avg WER, total laps, avg lap time) |
-| **📻 Messages** | Scrollable radio timeline → Dual transcript view (ground truth vs. Whisper) → WER badge (🟢 <20% · 🟡 <50% · 🔴 ≥50%) → Arousal/Valence/Dominance progress bars → Audio play/pause |
-| **🎙️ Upload** | Drag-and-drop file zone → Reference transcript input → Live Whisper + Wav2Vec2 analysis → Results panel with all metrics |
+| **🏎️ Pit-Wall (`PIT-WALL`)** | Race/Driver selectors → Live FastF1 telemetry cards with Sector 1/2/3 splits, Tyre compound age, Speed trap top speed → SVG pace chart with stress markers → Radio timeline with dual transcripts |
+| **📻 Timeline (`MESSAGES`)** | Full chronological radio feed → Dual transcript diff (Ground Truth vs. Whisper STT) → Monochrome WER badges → Continuous Arousal/Valence/Dominance 12-LED indicators → Audio playback with cache-busting |
+| **🎙️ Live Analyzer (`UPLOAD`)** | Drag-and-drop BYOC audio zone → Live Whisper speech decoding → Multi-modal acoustic prosody & Wav2Vec2 dimensional scoring → Instant stress classification result |
+| **🏁 Circuit Track (`CIRCUITS`)** | Visual overview of Grand Prix circuits with turn-by-turn telemetry tracking |
+
+### 🏁 Albert Park (Melbourne) Track Simulation Overlay
+
+An interactive, high-fidelity circuit simulator accessible via the **`🏁 TRACK SIM`** button or **`Shift + T`**:
+* **Circuit Geometry**: Exact 5.278 km SVG layout of Melbourne's Albert Park Circuit with illuminated apex kerbs (Jones chicane, Sports Centre, Marina, and Clark chicane).
+* **Live Telemetry Strip**: Speedometer (km/h), Throttle %, Brake %, Gear indicator, RPM tachometer, and Sector 1/2/3 split LEDs.
+* **Continuous Vehicle Motion**: Dynamic F1 race car navigating the track with animated exhaust flames via SVG `<animateMotion>`.
+* **Scrolling Radio Chatter**: Simulated pit-wall communications synchronized with the lap drive.
+
+### 🌟 Parc Fermé Visual Experience Layer
+
+* **`F1PhysicsCursor`**: Custom cursor with aerodynamic speed vector trail.
+* **`ThermalStateLayer`**: Dynamic chromatic vignette that heats up as driver vocal stress increases.
+* **`TyreSmokeBurst`**: Particle physics emitter triggering on high-stress radio playback.
+* **`AmbientCircuitTrace`**: Subtle glowing ambient circuit boundary trace around the viewport.
+* **`RevCounterLoader`**: RPM tachometer loading sequence during async operations.
 
 ### Threshold Tuner (Slide-Out Drawer)
 
-A right-side panel with two range sliders (`<input type="range">`) for `T_arousal` and `T_valence`. Clicking **"Re-classify All"** triggers `POST /api/reclassify` — all cached messages are re-scored against the new boundaries without re-running ML inference.
+A dedicated slide-out drawer with range sliders for $T_{arousal}$ and $T_{valence}$. Clicking **"Re-classify All"** executes `POST /api/reclassify`, instantaneously updating driver state classifications across all cached messages without re-running neural inference.
 
 ---
 
@@ -610,13 +630,13 @@ Upload .wav/.mp3 ──→ Temp file save ──→ ┬── Whisper STT ──
                                         │
                                         ├── WER vs. reference ──→ Accuracy %
                                         │
-                                        └── Wav2Vec2 ──→ Arousal / Valence / Dominance
-                                                              │
-                                                              ▼
-                                                    Threshold Classification
-                                                              │
-                                                              ▼
-                                                  🔴 STRESSED / 🟢 CALM / 🟡 TIRED
+                                        └── Wav2Vec2 + Prosody ──→ Arousal / Valence / Dominance
+                                                                        │
+                                                                        ▼
+                                                              Multi-Modal Hyperplane
+                                                                        │
+                                                                        ▼
+                                                            🔴 STRESSED / 🟢 CALM / 🟡 TIRED
 ```
 
 The temp file is **automatically cleaned up** after inference completes.

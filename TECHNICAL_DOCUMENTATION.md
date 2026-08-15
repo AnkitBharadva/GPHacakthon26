@@ -603,8 +603,24 @@ The pace-versus-stress matrix renders raw lap time points directly into an SVG c
 
 ### 7.5 Monospace Tabular Alignment & Typography
 
-* **Display / Nav / Headings:** **`Titillium Web`** (Google Fonts) — technical geometric sans.
+* **Display / Nav / Headings:** **`Titillium Web`** & **`Barlow Condensed`** (Google Fonts) — technical geometric sans.
 * **Numerical Metrics / Timings / WER / Coords:** **`JetBrains Mono`** (`font-mono tabular-nums`) — enforces fixed-width numerical columns preventing UI jitter during real-time data updates.
+
+### 7.6 Parc Fermé Visual Experience Layer & Melbourne Track Simulator
+
+The visual experience architecture deploys an interactive, sensory feedback engine:
+
+1. **Albert Park (Melbourne) Track Simulation Overlay (`F1TrackLoader.jsx`):**
+   * **Full-Screen SVG Telemetry Modal**: Renders the 5.278 km Melbourne Grand Prix Circuit with exact geometric curvature, apex kerbs, S1/S2/S3 split gates, and Start/Finish lines.
+   * **Live Cockpit Telemetry Strip**: Speed (km/h), Throttle %, Brake %, Gear (G), RPM tachometer (11,800 rpm), Sector LEDs, and live analysis timer.
+   * **Dynamic Car Motion**: Scaled Formula 1 race car animated continuously along the track coordinate vector with exhaust flame particle emission via `<animateMotion>`.
+   * **Instant Keyboard Shortcuts**: Pressing **`Shift + T`** opens the live simulation; **`Escape`** or **`ESC / CLOSE ✕`** returns immediately to the pit wall.
+
+2. **Parc Fermé Reactive Sensory Layer (`ExperienceLayer.jsx`):**
+   * **`ThermalStateLayer`**: Dynamic chromatic vignette that shifts color temperature and intensity in real-time as driver vocal stress increases.
+   * **`TyreSmokeBurst`**: Canvas-based 2D particle physics emitter triggering friction smoke bursts upon radio message playback.
+   * **`AmbientCircuitTrace`**: Subtle glowing cyan perimeter circuit trace running along the viewport border.
+   * **`F1PhysicsCursor`**: Custom high-speed aerodynamic cursor with vector motion trails.
 
 ---
 

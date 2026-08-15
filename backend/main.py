@@ -41,7 +41,12 @@ app.mount("/static/audio", StaticFiles(directory=AUDIO_DIR), name="audio")
 @app.on_event("startup")
 def on_startup():
     init_db()
-    populate_demo_data()
+    races = get_all_races()
+    if not races:
+        print("[Startup] Empty database detected, seeding demo data...")
+        populate_demo_data()
+    else:
+        print(f"[Startup] Database loaded successfully with {len(races)} races.")
 
 class ReclassifyRequest(BaseModel):
     arousal_thresh: float = 0.60

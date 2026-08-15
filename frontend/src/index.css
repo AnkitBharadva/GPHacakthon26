@@ -1,197 +1,417 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,600;0,700;0,800;0,900;1,700&family=JetBrains+Mono:wght@400;500;700&family=Titillium+Web:wght@200;300;400;600;700;900&display=swap');
 @import "tailwindcss";
 
 :root {
-  /* Semantic Mood Colors — STRICTLY RESERVED for driver mood only, NEVER decorative */
-  --mood-stressed: #ef4444;
-  --mood-calm: #22c55e;
-  --mood-fatigued: #eab308;
-
-  /* Reserved UI Chrome, Nav, Buttons, Live Indicators */
-  --accent-info: #22d3ee;
-  --accent-peak: #a855f7;  /* fastest lap / peak-stress marker — motorsport "purple sector" */
-
-  /* WER Monochrome Scale — CAN NEVER be misread as a mood */
+  --mood-stressed:  #E80020;
+  --mood-calm:      #22c55e;
+  --mood-fatigued:  #f59e0b;
+  --f1-red:         #E80020;
+  --f1-red-glow:    rgba(232,0,32,0.5);
+  --f1-red-dim:     rgba(232,0,32,0.15);
+  --f1-cyan:        #00D2BE;
+  --f1-purple:      #a855f7;
+  --f1-amber:       #FF8000;
+  --accent-info:    #00D2BE;
+  --accent-peak:    #a855f7;
   --wer-good: #e5e7eb;
   --wer-mid:  #9ca3af;
   --wer-poor: #4b5563;
-
-  --bg-primary:     #0a0a0f;
-  --bg-card:        rgba(18, 18, 30, 0.72);
+  --bg-primary:  #05050a;
+  --bg-card:     rgba(10,10,20,0.85);
+  --bg-glass:    rgba(15,15,28,0.7);
+  --bg-panel:    rgba(8,8,16,0.9);
   --text-primary:   #f4f4f5;
   --text-secondary: #9ca3af;
+  --border-subtle: rgba(255,255,255,0.07);
+  --border-red:    rgba(232,0,32,0.4);
+  --radius-soft: 12px;
+  --radius-hard: 3px;
+  --radius-mid:  6px;
+  --motion-corner-entry:   cubic-bezier(0.65,0,0.35,1);
+  --motion-launch-control: cubic-bezier(0.16,1,0.3,1);
+  --motion-checkered-wipe: cubic-bezier(0.4,0,0.2,1);
+}
+*, *::before, *::after { box-sizing: border-box; }
 
-  --radius-soft: 12px;  /* hero surfaces, glass cards only */
-  --radius-hard: 4px;   /* timing rows, gauges, badges — technical, not app-y */
-
-  /* Parc Fermé Motion Tokens (Section 3 of FRONTEND_VISUALS spec) */
-  --motion-corner-entry: cubic-bezier(0.65, 0, 0.35, 1);
-  --motion-launch-control: cubic-bezier(0.16, 1, 0.3, 1);
-  --motion-formation-lap: linear;
-  --motion-checkered-wipe: cubic-bezier(0.4, 0, 0.2, 1);
-  --motion-heat-haze: ease-in-out;
+/* ── Ferrari F1 hero background ── */
+html {
+  scroll-behavior: smooth;
+  min-height: 100vh;
+  background-color: #05050a !important;
 }
 
-@layer base {
-  body {
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    min-height: 100vh;
-    /* Faint carbon-fibre weave pattern (2.5% opacity diagonal weave) */
-    background-image: 
-      linear-gradient(45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%), 
-      linear-gradient(-45deg, rgba(255, 255, 255, 0.025) 25%, transparent 25%), 
-      linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.025) 75%), 
-      linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.025) 75%);
-    background-size: 8px 8px;
-    background-position: 0 0, 0 4px, 4px -4px, -4px 0px;
-    background-attachment: fixed;
-    overflow-x: hidden;
-  }
+/* body gets the actual image — overrides Tailwind v4 preflight bg reset */
+body {
+  min-height: 100vh;
+  color: var(--text-primary);
+  font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden;
+
+  /* THE IMAGE — Ferrari #55 wet track photo */
+  background-color: #05050a !important;
+  background-image:
+    linear-gradient(
+      to bottom,
+      rgba(4,4,10,0.48)  0%,
+      rgba(4,4,10,0.06) 28%,
+      rgba(4,4,10,0.06) 72%,
+      rgba(4,4,10,0.52) 100%
+    ),
+    url('/f1-bg.jpg') !important;
+  background-size: cover, cover !important;
+  background-position: center 55%, center 55% !important;
+  background-repeat: no-repeat, no-repeat !important;
+  background-attachment: fixed, fixed !important;
 }
 
-/* Custom Cursor Active State on Desktop */
+/* Make the entire React tree transparent so body bg shows through */
+#root { background: transparent !important; }
+#root > div { background: transparent !important; }
+
+
 @media (pointer: fine) {
   body.parc-ferme-active,
-  body.parc-ferme-active * {
-    cursor: none !important;
-  }
+  body.parc-ferme-active * { cursor: none !important; }
 }
-
-/* Monospace font class for all telemetry, data, timestamps, and numbers */
-.font-mono,
-.tabular-nums {
+h1, h2, h3, h4, h5, .font-display {
+  font-family: 'Barlow Condensed', 'Titillium Web', sans-serif;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+.font-mono, .tabular-nums, code, pre {
   font-family: 'JetBrains Mono', monospace;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
 }
-
-/* Headings and Display font */
-h1, h2, h3, h4, .font-display {
-  font-family: 'Titillium Web', sans-serif;
-  letter-spacing: 0.03em;
-}
-
-/* Glassmorphism utilities */
 .glass-panel {
-  background: var(--bg-card);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--border-subtle);
 }
-
 .glass-card {
-  background: rgba(18, 18, 30, 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--border-subtle);
 }
-
-/* System Thermal State Filters */
-.thermal-cold {
-  filter: saturate(0.92) brightness(0.95);
-  transition: filter 1.5s ease-out;
+.panel-red {
+  background: linear-gradient(135deg, rgba(232,0,32,0.08) 0%, rgba(10,10,20,0.9) 60%);
+  border: 1px solid var(--border-red);
+  box-shadow: 0 0 30px rgba(232,0,32,0.1), inset 0 1px 0 rgba(232,0,32,0.2);
 }
-
-.thermal-optimal {
-  filter: saturate(1.0) brightness(1.0);
-  transition: filter 0.8s ease-in-out;
+.panel-cyan {
+  background: linear-gradient(135deg, rgba(0,210,190,0.06) 0%, rgba(10,10,20,0.9) 60%);
+  border: 1px solid rgba(0,210,190,0.25);
+  box-shadow: 0 0 24px rgba(0,210,190,0.08), inset 0 1px 0 rgba(0,210,190,0.15);
 }
-
-.thermal-overheating {
-  animation: overheatPulse 2.4s infinite alternate;
+.glow-red    { text-shadow: 0 0 12px var(--f1-red), 0 0 30px rgba(232,0,32,0.4); }
+.glow-cyan   { text-shadow: 0 0 10px var(--f1-cyan), 0 0 25px rgba(0,210,190,0.35); }
+.shadow-glow-red  { box-shadow: 0 0 20px rgba(232,0,32,0.45), 0 4px 15px rgba(0,0,0,0.6); }
+.shadow-glow-cyan { box-shadow: 0 0 18px rgba(0,210,190,0.4), 0 4px 12px rgba(0,0,0,0.6); }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #06060d; }
+::-webkit-scrollbar-thumb { background: rgba(232,0,32,0.4); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--f1-red); }
+::selection { background: rgba(232,0,32,0.35); color: #fff; }
+@keyframes speedStreak {
+  0%   { transform: translateX(-120%) scaleX(0.4); opacity: 0; }
+  20%  { opacity: 0.5; }
+  80%  { opacity: 0.2; }
+  100% { transform: translateX(120%) scaleX(1.2); opacity: 0; }
 }
-
-@keyframes overheatPulse {
-  0% {
-    box-shadow: inset 0 0 40px rgba(239, 68, 68, 0.15);
-  }
-  100% {
-    box-shadow: inset 0 0 90px rgba(239, 68, 68, 0.35);
-  }
+@keyframes raceLivePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(232,0,32,0.7); }
+  50%       { opacity: 0.6; box-shadow: 0 0 0 6px rgba(232,0,32,0); }
 }
-
-/* Heat Haze Shimmer Filter */
-@keyframes heatHazeShimmer {
-  0%, 100% {
-    transform: translateY(0px) scale(1);
-    opacity: 0.85;
-  }
-  50% {
-    transform: translateY(-1.5px) scale(1.02);
-    opacity: 1;
-  }
-}
-
-/* Engine Jitter on Idle */
-@keyframes engineIdleJitter {
-  0% { transform: translate(0, 0); }
-  25% { transform: translate(0.8px, -0.6px); }
-  50% { transform: translate(-0.7px, 0.7px); }
-  75% { transform: translate(0.5px, 0.4px); }
-  100% { transform: translate(0, 0); }
-}
-
-/* Ghost Car Entrance Animation */
-@keyframes ghostCarPass {
-  0% {
-    transform: translateX(-140%) scale(0.95);
-    opacity: 0;
-  }
-  15% {
-    opacity: 0.45;
-  }
-  60% {
-    transform: translateX(50%) scale(1);
-    opacity: 0.35;
-  }
-  100% {
-    transform: translateX(200%) scale(0.95);
-    opacity: 0;
-  }
-}
-
-/* Checkered Transition Wipe */
 @keyframes checkeredWipeIn {
-  0% {
-    clip-path: inset(0 100% 0 0);
-    opacity: 0;
-  }
-  100% {
-    clip-path: inset(0 0 0 0);
-    opacity: 1;
-  }
+  0%   { clip-path: inset(0 100% 0 0); opacity: 0; }
+  100% { clip-path: inset(0 0 0 0); opacity: 1; }
 }
-
-.checkered-transition {
-  animation: checkeredWipeIn 180ms var(--motion-checkered-wipe) forwards;
+@keyframes ghostCarPass {
+  0%   { transform: translateX(-140%) scale(0.9); opacity: 0; }
+  15%  { opacity: 0.5; }
+  60%  { transform: translateX(50%) scale(1); opacity: 0.35; }
+  100% { transform: translateX(220%) scale(0.9); opacity: 0; }
 }
-
-/* Custom Telemetry Scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+@keyframes engineIdleJitter {
+  0%   { transform: translate(0,0); }
+  25%  { transform: translate(0.6px,-0.5px); }
+  50%  { transform: translate(-0.5px,0.6px); }
+  75%  { transform: translate(0.4px,0.3px); }
+  100% { transform: translate(0,0); }
 }
-
-::-webkit-scrollbar-track {
-  background: #08080c;
+@keyframes overheatPulse {
+  0%   { box-shadow: inset 0 0 40px rgba(232,0,32,0.12); }
+  100% { box-shadow: inset 0 0 100px rgba(232,0,32,0.35); }
 }
-
-::-webkit-scrollbar-thumb {
-  background: rgba(34, 211, 238, 0.3);
-  border-radius: 2px;
+@keyframes rowSlideIn {
+  from { opacity: 0; transform: translateX(-16px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent-info);
+@keyframes stressFlash {
+  0%, 100% { background-color: transparent; }
+  50%       { background-color: rgba(232,0,32,0.1); }
 }
-
-/* Selection */
-::selection {
-  background: rgba(34, 211, 238, 0.3);
-  color: #ffffff;
+@keyframes floatUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-/* Respect reduced motion */
+@keyframes scanLine {
+  0%   { top: 0; opacity: 0.1; }
+  100% { top: 100%; opacity: 0; }
+}
+@keyframes checkeredMove {
+  0%   { background-position: 0 0; }
+  100% { background-position: 40px 0; }
+}
+@keyframes ledFire {
+  0%,100% { box-shadow: 0 0 4px currentColor; }
+  50%      { box-shadow: 0 0 14px currentColor, 0 0 28px currentColor; }
+}
+.checkered-transition { animation: checkeredWipeIn 220ms var(--motion-checkered-wipe) forwards; }
+.anim-float-up   { animation: floatUp 0.5s var(--motion-launch-control) both; }
+.anim-float-up-1 { animation: floatUp 0.5s 0.1s var(--motion-launch-control) both; }
+.anim-float-up-2 { animation: floatUp 0.5s 0.2s var(--motion-launch-control) both; }
+.anim-float-up-3 { animation: floatUp 0.5s 0.3s var(--motion-launch-control) both; }
+.anim-float-up-4 { animation: floatUp 0.5s 0.4s var(--motion-launch-control) both; }
+.anim-row-in    { animation: rowSlideIn 0.35s var(--motion-launch-control) both; }
+.thermal-cold { filter: saturate(0.88) brightness(0.93); transition: filter 1.5s ease-out; }
+.thermal-optimal { filter: saturate(1) brightness(1); transition: filter 0.8s ease-in-out; }
+.thermal-overheating { animation: overheatPulse 2.4s infinite alternate; }
+.checkered-stripe {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 10px,
+    transparent 10px, transparent 20px
+  );
+  animation: checkeredMove 2s linear infinite;
+}
+.live-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--f1-red);
+  animation: raceLivePulse 1.4s infinite;
+  flex-shrink: 0;
+}
+.scan-line-container { position: relative; overflow: hidden; }
+.scan-line-container::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(0,210,190,0.25), transparent);
+  animation: scanLine 3s linear infinite;
+  pointer-events: none;
+}
+.timing-row {
+  border-left: 3px solid var(--row-accent, rgba(255,255,255,0.2));
+  transition: border-color 0.3s, background-color 0.3s;
+}
+.timing-row:hover { background-color: rgba(255,255,255,0.025); }
+.timing-row.stressed  { --row-accent: var(--mood-stressed); animation: stressFlash 3s ease-in-out 1; }
+.timing-row.calm      { --row-accent: var(--mood-calm); }
+.timing-row.fatigued  { --row-accent: var(--mood-fatigued); }
+.driver-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-hard);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.mood-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-hard);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.mood-badge.stressed {
+  background: rgba(232,0,32,0.15); color: #ff4d6a;
+  border: 1px solid rgba(232,0,32,0.45);
+  box-shadow: 0 0 10px rgba(232,0,32,0.2);
+}
+.mood-badge.calm {
+  background: rgba(34,197,94,0.12); color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.35);
+}
+.mood-badge.fatigued {
+  background: rgba(245,158,11,0.12); color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.35);
+}
+.wer-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-hard);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+}
+.shift-light-led {
+  height: 10px; flex: 1; border-radius: 1px;
+  transition: background-color 0.12s, box-shadow 0.12s;
+}
+.btn-f1 {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, #E80020 0%, #a0001a 100%);
+  color: #fff;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: var(--radius-hard); border: none;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(232,0,32,0.35), 0 3px 10px rgba(0,0,0,0.5);
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+.btn-f1:hover { box-shadow: 0 0 32px rgba(232,0,32,0.6), 0 3px 14px rgba(0,0,0,0.6); transform: translateY(-1px); }
+.btn-f1:active { transform: translateY(0); }
+.btn-f1:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 16px;
+  background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: var(--radius-hard);
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); color: #fff; }
+.btn-cyan {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px;
+  background: linear-gradient(135deg, rgba(0,210,190,0.25) 0%, rgba(0,150,140,0.25) 100%);
+  color: var(--f1-cyan);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase;
+  border-radius: var(--radius-hard);
+  border: 1px solid rgba(0,210,190,0.4);
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(0,210,190,0.2);
+  transition: box-shadow 0.2s, background 0.2s;
+}
+.btn-cyan:hover { box-shadow: 0 0 28px rgba(0,210,190,0.45); }
+.f1-input {
+  background: rgba(5,5,12,0.9);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-primary);
+  border-radius: var(--radius-hard);
+  padding: 9px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  width: 100%; outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.f1-input:focus { border-color: rgba(232,0,32,0.6); box-shadow: 0 0 0 2px rgba(232,0,32,0.12); }
+.f1-input::placeholder { color: rgba(255,255,255,0.25); }
+.f1-select {
+  background: rgba(5,5,12,0.9);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: var(--text-primary);
+  border-radius: var(--radius-hard);
+  padding: 9px 32px 9px 12px;
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  appearance: none; cursor: pointer; outline: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath fill='%23E80020' d='M5 7L0 2h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.f1-select:focus { border-color: rgba(232,0,32,0.6); box-shadow: 0 0 0 2px rgba(232,0,32,0.12); }
+.chart-bg {
+  background: rgba(3,3,8,0.95);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: var(--radius-hard);
+  position: relative; overflow: hidden;
+}
+.chart-bg::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.018) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+.stat-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-mid);
+  padding: 16px;
+  position: relative; overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.stat-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: var(--card-accent, var(--f1-red)); opacity: 0.7;
+}
+.stat-card:hover { border-color: rgba(232,0,32,0.3); box-shadow: 0 0 20px rgba(232,0,32,0.08); }
+.play-btn {
+  width: 34px; height: 34px;
+  border-radius: var(--radius-hard);
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: rgba(255,255,255,0.8);
+  cursor: pointer; flex-shrink: 0;
+  transition: all 0.2s;
+}
+.play-btn:hover { background: rgba(0,210,190,0.15); border-color: rgba(0,210,190,0.4); color: var(--f1-cyan); box-shadow: 0 0 14px rgba(0,210,190,0.25); }
+.play-btn.playing { background: rgba(0,210,190,0.25); border-color: var(--f1-cyan); color: var(--f1-cyan); box-shadow: 0 0 18px rgba(0,210,190,0.5); }
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(8px);
+  z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal-box {
+  background: linear-gradient(160deg, #0c0c1a 0%, #08080f 100%);
+  border: 1px solid rgba(232,0,32,0.35);
+  border-radius: var(--radius-mid);
+  box-shadow: 0 0 60px rgba(232,0,32,0.2), 0 30px 80px rgba(0,0,0,0.8);
+  max-width: 480px; width: 100%; padding: 28px;
+}
+input[type="range"] {
+  -webkit-appearance: none; appearance: none;
+  width: 100%; height: 4px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 2px; outline: none; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--f1-red);
+  box-shadow: 0 0 8px rgba(232,0,32,0.6); cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--f1-red);
+  box-shadow: 0 0 8px rgba(232,0,32,0.6);
+  border: none; cursor: pointer;
+}
+.section-header {
+  display: flex; align-items: center; gap: 10px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 700; font-size: 14px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-primary);
+}
+.section-header .accent-bar {
+  width: 3px; height: 18px;
+  background: var(--f1-red); border-radius: 2px;
+  box-shadow: 0 0 8px rgba(232,0,32,0.6); flex-shrink: 0;
+}
+@media (max-width: 768px) { .hide-mobile { display: none !important; } }
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;
@@ -199,7 +419,5 @@ h1, h2, h3, h4, .font-display {
     transition-duration: 0.01ms !important;
   }
   body.parc-ferme-active,
-  body.parc-ferme-active * {
-    cursor: auto !important;
-  }
+  body.parc-ferme-active * { cursor: auto !important; }
 }
