@@ -111,3 +111,4 @@ FRONTEND_VISUALS.md
 FRONTEND_VISUALS (1).md
 f1_team_radio_mp3s/metadata.csv
 F1_Driver_Tone_Detector_Model_Report.pdf
+backend/models/best_model.pt

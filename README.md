@@ -621,23 +621,33 @@ A dedicated slide-out drawer with range sliders for $T_{arousal}$ and $T_{valenc
 
 ---
 
-## 🎙 Live Demo Capability
+## 🎙 Dual-Model Live Demo Capability
 
-The **"Bring Your Own Clip"** feature allows judges/users to upload any audio file for instant analysis:
+The **"Bring Your Own Clip"** feature allows judges/users to upload any audio file for instant **concurrent dual-model analysis**:
 
 ```
-Upload .wav/.mp3 ──→ Temp file save ──→ ┬── Whisper STT ──→ Transcript
+Upload .wav/.mp3 ──→ Temp file save ──→ ┬── Whisper STT ──→ Text Transcription + WER vs. Reference
                                         │
-                                        ├── WER vs. reference ──→ Accuracy %
+                                        ├── Model A (Wav2Vec2 + Prosody + NLP)
+                                        │     └── Arousal / Valence / Dominance ──→ 🔴 STRESSED / 🟢 CALM / 🟡 TIRED
                                         │
-                                        └── Wav2Vec2 + Prosody ──→ Arousal / Valence / Dominance
-                                                                        │
-                                                                        ▼
-                                                              Multi-Modal Hyperplane
-                                                                        │
-                                                                        ▼
-                                                            🔴 STRESSED / 🟢 CALM / 🟡 TIRED
+                                        └── Model B (WinFunction/Tone-Detector-f1: WavLM + BiLSTM + Attention)
+                                              └── 6-Class Probability Breakdown:
+                                                  [Anger, Disgust, Fear, Happy, Neutral, Sad]
 ```
+
+### Comparative Dual-Model Outputs in HUD:
+
+1. **Model A — Multi-Modal Continuous Telemetry Engine (`Wav2Vec2 MSP-DIM`):**
+   * Operational State badge (`STRESSED`, `TIRED`, `CALM`)
+   * Continuous $[A, V, D] \in [0, 1]^3$ 12-LED shift light strip and valence needle
+   * Dynamic threshold tuning via live slider drawer
+
+2. **Model B — Deep Learning Categorical Classifier (`WinFunction/Tone-Detector-f1`):**
+   * **Translated 3-State Mood Badge**: Translated into `STRESSED` (Anger + Disgust + Fear), `TIRED` (Sad), and `CALM` (Neutral + Happy)
+   * **Segmented 3-Class Aggregation Bar**: Live percentage split across the 3 translated operational states
+   * **6-Class Raw Probability Meters**: Detailed breakdown for Anger (🔴), Neutral (🟢), Happy (🟡), Disgust (🟠), Fear (🟣), and Sad (🔵)
+   * Trained on CREMA-D with 67.86% holdout accuracy and 0.6794 macro F1-score
 
 The temp file is **automatically cleaned up** after inference completes.
 

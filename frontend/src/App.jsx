@@ -1042,7 +1042,22 @@ export default function App() {
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-white/5">
+                  {/* Model A: Multi-Modal Continuous Telemetry Engine */}
+                  <div className="p-3.5 bg-[#03030a] rounded-[3px] border border-[#00D2BE]/20 space-y-2">
+                    <div className="flex items-center justify-between border-b border-white/8 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 bg-[#00D2BE] text-black text-[9px] font-bold rounded-[2px] tracking-wider uppercase">
+                          MODEL A · CONTINUOUS DIMENSIONAL & PROSODY ENGINE
+                        </span>
+                        <span className="text-[9px] font-mono text-white/40">
+                          audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-white/60">
+                        Operational State: <strong className="text-white">{uploadResult.mood_label}</strong>
+                      </span>
+                    </div>
+
                     <ShiftLightStrip
                       arousal={uploadResult.arousal}
                       valence={uploadResult.valence}
@@ -1050,6 +1065,123 @@ export default function App() {
                       thresholdArousal={arousalThresh}
                     />
                   </div>
+
+                  {/* Model B: Custom 6-Class F1 Driver Tone Detector (WinFunction/Tone-Detector-f1) */}
+                  {uploadResult.tone_detector && (
+                    <div className="p-4 bg-[#050512] rounded-[4px] border border-[#a855f7]/30 space-y-3.5">
+                      {/* Header with Translated 3-Class Mood State */}
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/8 pb-2.5">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-[#a855f7] text-white text-[9px] font-bold rounded-[2px] tracking-wider uppercase">
+                            MODEL B · TONE DETECTOR
+                          </span>
+                          <span className="text-[10px] font-mono text-white/50">
+                            WinFunction/Tone-Detector-f1 (WavLM + BiLSTM + Attention)
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono text-white/40">Translated State:</span>
+                          <MoodBadge mood={uploadResult.tone_detector.translated_state || 'CALM'} />
+                          <span className="text-[10px] font-mono text-white/30">
+                            ({uploadResult.tone_detector.translated_confidence?.toFixed(1)}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 3-Class Translated Aggregation Bar */}
+                      <div className="p-3 bg-white/3 rounded-[3px] border border-white/6 space-y-2">
+                        <div className="flex items-center justify-between text-[10px] font-mono">
+                          <span className="text-white/40 uppercase font-bold tracking-wider text-[9px]">
+                            Top-1 Winning-Class Translation (Anger/Disgust/Fear ➔ Stressed | Sad ➔ Tired | Neutral/Happy ➔ Calm)
+                          </span>
+                          <span className="text-white/60 font-bold">
+                            Top Tone: <strong className="text-[#00D2BE]">{uploadResult.tone_detector.predicted_emotion}</strong> ({uploadResult.tone_detector.confidence?.toFixed(1)}%)
+                          </span>
+                        </div>
+
+                        {/* Segmented Bar */}
+                        <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden flex">
+                          <div
+                            className="h-full bg-[#ef4444] transition-all duration-500"
+                            style={{ width: `${uploadResult.tone_detector.translated_probabilities?.STRESSED || 0}%` }}
+                            title={`STRESSED: ${uploadResult.tone_detector.translated_probabilities?.STRESSED}%`}
+                          />
+                          <div
+                            className="h-full bg-[#eab308] transition-all duration-500"
+                            style={{ width: `${uploadResult.tone_detector.translated_probabilities?.TIRED || 0}%` }}
+                            title={`TIRED: ${uploadResult.tone_detector.translated_probabilities?.TIRED}%`}
+                          />
+                          <div
+                            className="h-full bg-[#22c55e] transition-all duration-500"
+                            style={{ width: `${uploadResult.tone_detector.translated_probabilities?.CALM || 0}%` }}
+                            title={`CALM: ${uploadResult.tone_detector.translated_probabilities?.CALM}%`}
+                          />
+                        </div>
+
+                        {/* Translated 3-Class Metrics */}
+                        <div className="grid grid-cols-3 gap-2 text-center text-[10px] font-mono">
+                          <div className="p-1.5 rounded-[2px] bg-red-500/10 border border-red-500/20">
+                            <span className="text-red-400 block text-[8px] uppercase">🔴 STRESSED (A+D+F)</span>
+                            <strong className="text-white">{uploadResult.tone_detector.translated_probabilities?.STRESSED?.toFixed(1)}%</strong>
+                          </div>
+                          <div className="p-1.5 rounded-[2px] bg-yellow-500/10 border border-yellow-500/20">
+                            <span className="text-yellow-400 block text-[8px] uppercase">🟡 TIRED (Sad)</span>
+                            <strong className="text-white">{uploadResult.tone_detector.translated_probabilities?.TIRED?.toFixed(1)}%</strong>
+                          </div>
+                          <div className="p-1.5 rounded-[2px] bg-green-500/10 border border-green-500/20">
+                            <span className="text-green-400 block text-[8px] uppercase">🟢 CALM (N+H)</span>
+                            <strong className="text-white">{uploadResult.tone_detector.translated_probabilities?.CALM?.toFixed(1)}%</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 6 Class Raw Probability Grid */}
+                      <div>
+                        <span className="text-[9px] font-mono text-white/35 uppercase tracking-wider block mb-2">
+                          Underlying 6-Class Neural Probability Distribution:
+                        </span>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                          {[
+                            ['Anger', '#ef4444', '🔴 High Stress / Rage ➔ STRESSED'],
+                            ['Neutral', '#22c55e', '🟢 Baseline / Composed ➔ CALM'],
+                            ['Happy', '#eab308', '🟡 Celebration / Pace ➔ CALM'],
+                            ['Disgust', '#f97316', '🟠 Mechanical Discontent ➔ STRESSED'],
+                            ['Fear', '#a855f7', '🟣 Collision / Distress ➔ STRESSED'],
+                            ['Sad', '#3b82f6', '🔵 Fatigue / Resignation ➔ TIRED'],
+                          ].map(([clsName, colorHex, subDesc]) => {
+                            const prob = uploadResult.tone_detector.probabilities?.[clsName] || 0;
+                            const isDominant = uploadResult.tone_detector.predicted_emotion === clsName;
+                            return (
+                              <div
+                                key={clsName}
+                                className={`p-2 rounded-[3px] border transition-all ${
+                                  isDominant ? 'bg-white/6 border-white/30' : 'bg-white/2 border-white/5'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                                  <span className="font-bold uppercase" style={{ color: colorHex }}>
+                                    {clsName}
+                                  </span>
+                                  <span className="text-white font-bold">{prob.toFixed(1)}%</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-1">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{
+                                      width: `${Math.min(100, Math.max(2, prob))}%`,
+                                      backgroundColor: colorHex,
+                                      boxShadow: isDominant ? `0 0 8px ${colorHex}` : 'none',
+                                    }}
+                                  />
+                                </div>
+                                <span className="text-[7.5px] text-white/30 block font-mono truncate">{subDesc}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -17,6 +17,7 @@ from backend.stt_engine import transcribe_audio, compute_wer
 from backend.emotion_engine import analyze_stress_and_emotion, classify_mood
 from backend.process_dataset import populate_demo_data
 from backend.alignment import match_single_timestamp_to_lap
+from backend.f1_tone_classifier import predict_f1_tone
 
 app = FastAPI(
     title="The Silent Co-Driver API",
@@ -47,6 +48,15 @@ def on_startup():
         populate_demo_data()
     else:
         print(f"[Startup] Database loaded successfully with {len(races)} races.")
+    
+    # Pre-warm F1 Tone Detector
+    try:
+        from backend.f1_tone_classifier import get_tone_predictor
+        print("[Startup] Pre-warming F1 Tone Detector model...")
+        get_tone_predictor()
+        print("[Startup] F1 Tone Detector pre-warmed and ready.")
+    except Exception as e:
+        print(f"[Startup Warning] Could not pre-warm tone detector: {e}")
 
 class ReclassifyRequest(BaseModel):
     arousal_thresh: float = 0.60
@@ -177,6 +187,9 @@ async def upload_audio_clip(
             whisper_transcript=whisper_transcript
         )
         
+        # Model 2: Custom Deep Learning Classifier (WinFunction/Tone-Detector-f1: WavLM + BiLSTM + Attention)
+        tone_detector_res = predict_f1_tone(temp_path)
+
         return {
             "filename": save_filename,
             "audio_url": f"/static/audio/{save_filename}",
@@ -188,6 +201,8 @@ async def upload_audio_clip(
             "dominance": emotion_result["dominance"],
             "valence": emotion_result["valence"],
             "mood_label": emotion_result["mood_label"],
+            "prosody": emotion_result.get("prosody", {}),
+            "tone_detector": tone_detector_res,
             "telemetry_matched": lap_info.get("matched", False),
             "lap_number": lap_info.get("lap_number"),
             "lap_time_seconds": lap_info.get("lap_time_seconds"),

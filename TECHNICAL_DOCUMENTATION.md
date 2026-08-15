@@ -389,10 +389,98 @@ Raw Audio Signal (WAV/MP3/M4A)
   ▼
 [Temporal Chunking] ➔ If duration > 30s ➔ Partition into 30s sliding blocks
   │
-  ├───► Stream A: Whisper Log-Mel Feature Generation ➔ Text Transcription + WER
-  │
-  └───► Stream B: Wav2Vec2 Feature Extraction ➔ Head Projection ➔ [A, D, V]
+### 5.5 Dual-Model Inference Architecture (Continuous Telemetry + 6-Class Tone Classification)
+
+The Live Audio Clip Analyzer deploys a **Dual-Model Inference Engine** that runs two complementary neural architectures concurrently on every uploaded radio transmission:
+
 ```
+                                  ┌──────────────────────────────────────────────┐
+                                  │           INCOMING RADIO AUDIO CLIP          │
+                                  └──────────────────────┬───────────────────────┘
+                                                         │
+                                ┌────────────────────────┴────────────────────────┐
+                                ▼                                                 ▼
+                 ┌─────────────────────────────┐                   ┌─────────────────────────────┐
+                 │  MODEL A: CONTINUOUS ENGINE │                   │  MODEL B: TONE DETECTOR-F1  │
+                 │   (wav2vec2-large-robust)   │                   │   (wavlm-base-plus-bilstm)  │
+                 ├─────────────────────────────┤                   ├─────────────────────────────┤
+                 │ • Arousal  ∈ [0.0, 1.0]     │                   │ • Anger Probability    (%)  │
+                 │ • Valence  ∈ [0.0, 1.0]     │                   │ • Neutral Probability  (%)  │
+                 │ • Dominance ∈ [0.0, 1.0]    │                   │ • Happy Probability    (%)  │
+                 │ • Prosody (RMS & ZCR)       │                   │ • Disgust Probability  (%)  │
+                 │ • Domain NLP Urgency Biases │                   │ • Fear Probability     (%)  │
+                 │ • Dynamic Threshold Sliders │                   │ • Sad Probability      (%)  │
+                 ├─────────────────────────────┤                   ├─────────────────────────────┤
+                 │   Output: Operational State │                   │  Output: Dominant Tone &    │
+                 │   🔴 STRESSED / 🟣 TIRED /  │                   │  6-Class Distribution (%)   │
+                 │   🟢 CALM                   │                   │  (WinFunction/Tone-Detector)│
+                 └──────────────┬──────────────┘                   └──────────────┬──────────────┘
+                                │                                                 │
+                                └────────────────────────┬────────────────────────┘
+                                                         ▼
+                                          ┌─────────────────────────────┐
+                                          │   DUAL-MODEL HUD DASHBOARD  │
+                                          │  Side-by-Side Comparative   │
+                                          │  Real-Time Visualization    │
+                                          └─────────────────────────────┘
+```
+
+#### Dual-Model Contract in `/api/audio/upload`:
+
+```json
+{
+  "filename": "upload_radio.wav",
+  "whisper_transcript": "I am clipping like hell on the straight",
+  "wer": 0.125,
+  "duration": 4.2,
+  "arousal": 0.8224,
+  "valence": 0.6847,
+  "dominance": 0.7997,
+  "mood_label": "STRESSED",
+  "prosody": {
+    "rms_energy": 0.0482,
+    "zcr": 0.0891,
+    "spectral_centroid": 1840.5
+  },
+  "tone_detector": {
+    "status": "success",
+    "model_name": "WinFunction/Tone-Detector-f1",
+    "model_architecture": "WavLM-Base-Plus + BiLSTM + Attention Head",
+    "predicted_emotion": "Fear",
+    "confidence": 49.56,
+    "translated_state": "STRESSED",
+    "translated_confidence": 67.78,
+    "translated_probabilities": {
+      "STRESSED": 67.78,
+      "TIRED": 20.24,
+      "CALM": 11.98
+    },
+    "probabilities": {
+      "Anger": 0.32,
+      "Disgust": 17.90,
+      "Fear": 49.56,
+      "Happy": 11.56,
+      "Neutral": 0.42,
+      "Sad": 20.24
+    },
+    "translation_mapping": {
+      "STRESSED": ["Anger", "Disgust", "Fear"],
+      "TIRED": ["Sad"],
+      "CALM": ["Neutral", "Happy"]
+    }
+  }
+}
+```
+
+#### 6-to-3 Class Translation Matrix:
+
+To enable instantaneous cross-model agreement checks with Model A, Model B's 6 categorical probabilities are aggregated into the 3 canonical pit-wall operational states:
+
+| Canonical Operational State | Aggregated Model B Emotion Classes | Mathematical Formulation | Racing Telemetry Context |
+| :--- | :--- | :--- | :--- |
+| **🔴 `STRESSED`** | **Anger** + **Disgust** + **Fear** | $P(\text{STRESSED}) = P(\text{Anger}) + P(\text{Disgust}) + P(\text{Fear})$ | Severe grievances, clipping warnings, collision alarms |
+| **🟣 `TIRED`** | **Sad** | $P(\text{TIRED}) = P(\text{Sad})$ | Physical exhaustion, resignation, tyre death |
+| **🟢 `CALM`** | **Neutral** + **Happy** | $P(\text{CALM}) = P(\text{Neutral}) + P(\text{Happy})$ | Composed engineering confirmations, victory pace |
 
 ---
 
