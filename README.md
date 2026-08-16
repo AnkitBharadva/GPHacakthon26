@@ -15,7 +15,7 @@
 > *"It's not fun at all. It's like Mario Kart. This is not racing."*  
 > — **DU DU DU DU, Max Verstappen 🏎️🇳🇱**
 
-[🚀 1-Minute Quickstart](#-1-minute-quickstart) · [🧠 How It Works (ELI5)](#-how-it-works-in-simple-terms-eli5) · [✨ Key Highlights](#-why-recruiters--employers-love-this-project) · [🏗️ Architecture](#%EF%B8%8F-system-architecture) · [🤖 Dual-Model AI Engine](#-dual-model-machine-learning-pipeline) · [📡 API Docs](#-rest-api-reference)
+[🚀 1-Minute Quickstart](#-1-minute-quickstart) · [🧠 How It Works (ELI5)](#-how-it-works-in-simple-terms-eli5) · [🏗️ Architecture](#%EF%B8%8F-system-architecture) · [🤖 Dual-Model AI Engine](#-dual-model-machine-learning-pipeline) · [📡 API Docs](#-rest-api-reference)
 
 ---
 
@@ -24,7 +24,6 @@
 ## 📖 Table of Contents
 
 - [🏎️ How It Works in Simple Terms (ELI5)](#-how-it-works-in-simple-terms-eli5)
-- [✨ Why Recruiters & Employers Love This Project](#-why-recruiters--employers-love-this-project)
 - [🎯 The High-Stakes Problem](#-the-high-stakes-problem)
 - [🏗️ System Architecture](#%EF%B8%8F-system-architecture)
 - [🤖 Dual-Model Machine Learning Pipeline](#-dual-model-machine-learning-pipeline)
@@ -60,19 +59,6 @@
 | <span style="color:#ef4444; font-weight:bold;">🔴 STRESSED</span> | High adrenaline, frustration, panic, or urgent grievances. | *"It's not fun at all. It's like Mario Kart. This is not racing."* (Max Verstappen) / *"I am clipping like hell!"* |
 | <span style="color:#eab308; font-weight:bold;">🟡 TIRED</span> | Vocal fatigue, physical exhaustion, loss of concentration. | *"Tyres have zero grip left... I can't hold him behind."* |
 | <span style="color:#22c55e; font-weight:bold;">🟢 CALM</span> | Composed, focused, executing strategy in optimal flow state. | *"Understood, box this lap. Copy that pace."* |
-
----
-
-## ✨ Why Recruiters & Employers Love This Project
-
-This is **not a simple wrapper or toy app**. It is an end-to-end, production-grade AI system featuring:
-
-* 🧠 **Concurrent Dual-Model Deep Learning**: Runs two distinct PyTorch neural architectures simultaneously—Continuous 3D $[A, V, D]$ Acoustic Hyperplanes + Custom 6-Class `WavLM-Base-Plus` BiLSTM Temporal Attention.
-* 🎯 **Entropy Bias Resolution (Top-1 Argmax Mapping)**: Solved real-world neural entropy skew caused by background noise summing negative classes.
-* 🏎️ **Millisecond Telemetry Alignment**: Integrates with official Formula 1 telemetry via FastF1, matching UTC radio timestamps to lap numbers, sector splits, tyre life, and pit stops.
-* ⚡ **Ultra-Low Latency Inference**: Pre-warmed model weights in RAM with lazy thread-safe singletons and streaming SQLite caching.
-* 🎨 **Parc Fermé Glassmorphic Design**: Custom React 19 interface with SVG pace charts, Melbourne Albert Park live track simulation, 12-LED F1 shift-light rev limiters, and dynamic thermal vignettes—**zero charting libraries, 100% custom engineering**.
-* 🎛️ **Real-Time Threshold Tuner**: Live sensitivity slider drawer allowing engineers to dynamically re-classify 58+ laps on-the-fly (`POST /api/reclassify`) without re-running models.
 
 ---
 
@@ -375,6 +361,8 @@ While designed for Formula 1, this exact dual-model cognitive telemetry architec
 <div align="center">
 
 **Built with ❤️ for High-Speed AI Engineering & Formula 1 Intelligence**
+
+🏁 *Made during Grand Prix Hackathon 2026* 🏁
 
 [⬆ Back to Top](#️-the-silent-co-driver)
 
